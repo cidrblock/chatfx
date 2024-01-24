@@ -11,7 +11,6 @@ from aioax25.kiss import make_device
 from aioax25.interface import AX25Interface
 from aioax25.frame import AX25RawFrame
 
-from aioconsole import ainput
 import time
 from prompt_toolkit import PromptSession, ANSI, HTML
 from prompt_toolkit.styles import Style
