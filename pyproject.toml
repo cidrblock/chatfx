@@ -1,0 +1,26 @@
+
+
+[tool]
+
+[tool.black]
+line-length = 100
+
+
+
+[tool.ruff]
+fix = true
+line-length = 100
+builtins = ["__"]
+select = ["ALL"]
+
+
+[tool.ruff.flake8-pytest-style]
+parametrize-values-type = "tuple"
+
+[tool.ruff.isort]
+force-single-line = true # Force from .. import to be 1 per line
+lines-after-imports = 2 # Ensures consistency for cases when there's variable vs function/class definitions after imports
+lines-between-types = 1 # Separate import/from with 1 line
+
+[tool.ruff.pydocstyle]
+convention = "pep257"
