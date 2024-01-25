@@ -120,7 +120,7 @@ class Chat:
                     control=0,
                     payload=payload
                 )
-            time.sleep(0.5)
+            time.sleep(5.0)
             self.interface.transmit(raw_frame, self.xmit_cb)
             LOGGER.info(f"Sent AX25 ACK: {raw_frame}")
             return
