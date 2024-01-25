@@ -71,28 +71,33 @@ class Chat:
         return datetime.now().strftime("%m/%d/%y %H:%M:%S")
     
     def line_print(self, ts, indicator, source, dest, message):
-        try:
-            scolor = self.colors[source]
-        except KeyError:
-            scolor = "white"
-        try:
-            dcolor = self.colors[dest]
-        except KeyError:
-            dcolor = "white"
-        
-        try:
-            mycolor = self.colors[self.callsign]
-        except KeyError:
-            mycolor = "white"
+        if indicator == "S":
+            scolor = "grey"
+            dcolor = "grey"
+            mcolor = "grey"
+        else:
+            try:
+                scolor = self.colors[source]
+            except KeyError:
+                scolor = "white"
+            try:
+                dcolor = self.colors[dest]
+            except KeyError:
+                dcolor = "white"
+            
+            try:
+                mycolor = self.colors[self.callsign]
+            except KeyError:
+                mycolor = "white"
+            
+            if source == self.callsign:
+                mcolor = mycolor
+            else:
+                mcolor = scolor
         
         pre = f"<grey>{ts} {indicator}\u2502</grey>"
         source = f"<{scolor}>{source}</{scolor}>"
-        dest = f"<{dcolor}>{dest}</{dcolor}>"
-        if source == self.callsign:
-            mcolor = mycolor
-        else:
-            mcolor = scolor
-        
+        dest = f"<{dcolor}>{dest}</{dcolor}>"  
         message = f"<{mcolor}>{message}</{mcolor}>"
         print_formatted_text(HTML(f"{pre}{source}>{dest} {message}"))
 
@@ -170,6 +175,7 @@ class Chat:
             self.interface.transmit(raw_frame, self.xmit_cb)
             LOGGER.info(f"Sent AX25: {raw_frame}")
             self.pending_ack[self.counter] = (ts, self.counter, self.callsign, dest, message)
+            self.line_print(ts, "S", self.callsign, dest, message)
             self.counter += 1
     
     
