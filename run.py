@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
 
@@ -141,6 +142,9 @@ class Chat:
             if line == "/quit":
                 self.exit = True
                 return
+            if line == "/clear":
+                os.system("clear")  # noqa: ASYNC102, S607, S605
+                continue
 
             ts = self.now()
             try:
@@ -190,6 +194,7 @@ class Chat:
 
 
 def main(callsign: str):
+    os.system("clear")  # noqa: ASYNC102, S607, S605
     chat = Chat(callsign=callsign)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
