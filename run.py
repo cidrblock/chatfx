@@ -25,7 +25,7 @@ import json
 
 LOGGER = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.CRITICAL)
 
 
 STYLE = Style.from_dict({
