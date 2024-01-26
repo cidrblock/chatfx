@@ -165,6 +165,7 @@ class Chat:
         self.callsign: str = callsign
         self.colors: dict[str, str] = {}
         self.counter: int = 0
+        self.device: TCPKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
@@ -181,17 +182,18 @@ class Chat:
 
     async def build_device(self: Chat) -> TCPKISSDevice:
         """Build the TCPKISSDevice."""
-        device = make_device(
+        self.device = make_device(
             type="tcp",
             host="localhost",
             port=8001,
             kiss_commands=[],
             log=LOGGER,
         )
-        device.open()
+        self.device.open()
+        await asyncio.sleep(0.1)
         i = 1
         max_attempts = 4
-        while device.state != KISSDeviceState.OPEN:
+        while self.device.state != KISSDeviceState.OPEN:
             msg = f"Waiting for direwolf connection... attempt {i}/{max_attempts}"
             print(msg, end="\r")  # noqa: T201
             if i > max_attempts:
@@ -201,9 +203,8 @@ class Chat:
 
             await asyncio.sleep(1)
             i += 1
-        msg = f"Device: {device} opened"
+        msg = f"Device: {self.device} opened"
         LOGGER.info(msg)
-        return device
 
     def now(self: Chat) -> str:
         """Return the current time in the format: MM/DD/YY HH:MM:SS."""
@@ -363,8 +364,7 @@ class Chat:
 
     async def process(self: Chat) -> None:
         """Process the interface."""
-        device = await self.build_device()
-        interface = AX25Interface(kissport=device[0], log=LOGGER)
+        interface = AX25Interface(kissport=self.device[0], log=LOGGER)
         interface.bind(callback=self.rx_frame, callsign=self.callsign, ssid=0, regex=False)
 
         while True:
@@ -399,6 +399,7 @@ def main(callsign: str) -> None:
     chat = Chat(callsign=callsign)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    loop.run_until_complete(chat.build_device())
     loop.run_until_complete(chat.run())
     loop.close()
 
