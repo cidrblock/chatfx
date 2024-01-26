@@ -399,7 +399,6 @@ def main(callsign: str) -> None:
     chat = Chat(callsign=callsign)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(chat.build_device())
     loop.run_until_complete(chat.run())
     loop.close()
 
