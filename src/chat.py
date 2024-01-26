@@ -26,7 +26,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
 
 
-TIME_BETWEEN_TX = 5.0
+TIME_BETWEEN_COMM = 5.0
 LOGGER = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.CRITICAL)
@@ -169,7 +169,7 @@ class Chat:
         self.interface: AX25Interface
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
         self.out_queue: list[AX25RawFrame] = []
-        self.last_send: datetime = datetime.now(timezone.utc)
+        self.last_comm: datetime = datetime.now(timezone.utc)
         self.busy: bool = False
         self._load_colors()
 
@@ -260,6 +260,7 @@ class Chat:
             interface: The interface.
             frame: The frame.
         """
+        self.last_comm = datetime.now(timezone.utc)
         msg = f"Received frame: {frame} on {interface}"
         LOGGER.debug(msg)
         info_byte = InfoByte.from_int(frame.frame_payload[0])
@@ -357,7 +358,7 @@ class Chat:
         """
         msg = f"Transmit complete: {frame} on {interface}"
         LOGGER.debug(msg)
-        self.last_send = datetime.now(timezone.utc)
+        self.last_comm = datetime.now(timezone.utc)
         self.busy = False
 
     async def process(self: Chat) -> None:
@@ -375,7 +376,7 @@ class Chat:
             if self.busy:
                 await asyncio.sleep(0.1)
                 continue
-            if (datetime.now(timezone.utc) - self.last_send).seconds < TIME_BETWEEN_TX:
+            if (datetime.now(timezone.utc) - self.last_comm).seconds < TIME_BETWEEN_COMM:
                 await asyncio.sleep(0.1)
                 continue
             frame = self.out_queue.pop(0)
