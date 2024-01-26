@@ -165,11 +165,12 @@ class Chat:
         self.callsign: str = callsign
         self.colors: dict[str, str] = {}
         self.counter: int = 0
-        self.device: TCPKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
         self.out_queue: list[AX25RawFrame] = []
+        self.last_send: datetime = datetime.now(timezone.utc)
+        self.busy: bool = False
         self._load_colors()
 
     def _load_colors(self: Chat) -> None:
@@ -178,19 +179,19 @@ class Chat:
         with file.open(encoding="utf-8") as f:
             self.colors = json.load(f)
 
-    async def build_device(self: Chat) -> None:
+    async def build_device(self: Chat) -> TCPKISSDevice:
         """Build the TCPKISSDevice."""
-        self.device = make_device(
+        device = make_device(
             type="tcp",
             host="localhost",
             port=8001,
             kiss_commands=[],
             log=LOGGER,
         )
-        self.device.open()
+        device.open()
         i = 1
         max_attempts = 4
-        while self.device.state != KISSDeviceState.OPEN:
+        while device.state != KISSDeviceState.OPEN:
             msg = f"Waiting for direwolf connection... attempt {i}/{max_attempts}"
             print(msg, end="\r")  # noqa: T201
             if i > max_attempts:
@@ -200,8 +201,9 @@ class Chat:
 
             await asyncio.sleep(1)
             i += 1
-        msg = f"Device: {self.device} opened"
+        msg = f"Device: {device} opened"
         LOGGER.info(msg)
+        return device
 
     def now(self: Chat) -> str:
         """Return the current time in the format: MM/DD/YY HH:MM:SS."""
@@ -346,17 +348,23 @@ class Chat:
             self.line_print(ts, "S", self.callsign, dest, message)
             self.counter += 1
 
-    async def receive(self: Chat) -> None:
-        """Receive a frame."""
-        interface = AX25Interface(kissport=self.device[0], log=LOGGER)
+    def tx_complete(self: Chat, interface: AX25Interface, frame: AX25RawFrame) -> None:
+        """Transmit complete callback.
+
+        Args:
+            interface: The interface.
+            frame: The frame.
+        """
+        msg = f"Transmit complete: {frame} on {interface}"
+        LOGGER.debug(msg)
+        self.last_send = datetime.now(timezone.utc)
+        self.busy = False
+
+    async def process(self: Chat) -> None:
+        """Process the interface."""
+        device = await self.build_device()
+        interface = AX25Interface(kissport=device[0], log=LOGGER)
         interface.bind(callback=self.rx_frame, callsign=self.callsign, ssid=0, regex=False)
-
-        msg = f"Interface: {interface} bound to callback"
-        LOGGER.info(msg)
-
-    async def process_out_queue(self: Chat) -> None:
-        """Process the out queue."""
-        interface = AX25Interface(kissport=self.device[0], log=LOGGER)
 
         while True:
             if self.exit:
@@ -364,16 +372,20 @@ class Chat:
             if len(self.out_queue) == 0:
                 await asyncio.sleep(0.1)
                 continue
-            await asyncio.sleep(TIME_BETWEEN_TX)
+            if self.busy:
+                await asyncio.sleep(0.1)
+                continue
+            if (datetime.now(timezone.utc) - self.last_send).seconds < TIME_BETWEEN_TX:
+                await asyncio.sleep(0.1)
+                continue
             frame = self.out_queue.pop(0)
-            interface.transmit(frame)
+            interface.transmit(frame, callback=self.tx_complete)
 
     async def run(self: Chat) -> None:
         """Run the chat client."""
         async with asyncio.TaskGroup() as tg:
-            _task1 = tg.create_task(self.receive())
             _task2 = tg.create_task(self.send())
-            _task3 = tg.create_task(self.process_out_queue())
+            _task3 = tg.create_task(self.process())
 
 
 def main(callsign: str) -> None:
