@@ -26,7 +26,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
 
 
-TIME_BETWEEN_COMM = 5.0
+TIME_BETWEEN_COMM = 2.0
 LOGGER = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.CRITICAL)
