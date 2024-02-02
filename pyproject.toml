@@ -1,4 +1,41 @@
+[build-system]
+requires = [
+    "setuptools >= 65.3.0",          # required by pyproject+setuptools_scm integration and editable installs
+    "setuptools_scm[toml] >= 7.0.5", # required for "no-local-version" scheme
+]
+build-backend = "setuptools.build_meta"
 
+[project]
+name = "chatfx"
+description = "A radical approach to testing ansible content"
+readme = "README.md"
+keywords = ["ax25", "fx25", "ham"]
+license = { text = "MIT" }
+maintainers = [{ "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" }]
+authors = [{ "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" }]
+requires-python = ">=3.9"
+classifiers = [
+    'Development Status :: 2 - Pre-Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Utilities',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
+]
+dynamic = ["dependencies", "optional-dependencies", "version"]
+
+[project.scripts]
+chatfx = "chatfx.run:main"
 
 [tool]
 
@@ -16,14 +53,24 @@ line-length = 100
 builtins = ["__"]
 select = ["ALL"]
 
-
 [tool.ruff.flake8-pytest-style]
 parametrize-values-type = "tuple"
 
 [tool.ruff.isort]
 force-single-line = true # Force from .. import to be 1 per line
-lines-after-imports = 2 # Ensures consistency for cases when there's variable vs function/class definitions after imports
-lines-between-types = 1 # Separate import/from with 1 line
+lines-after-imports = 2  # Ensures consistency for cases when there's variable vs function/class definitions after imports
+lines-between-types = 1  # Separate import/from with 1 line
 
 [tool.ruff.pydocstyle]
 convention = "pep257"
+
+
+[tool.setuptools.dynamic]
+dependencies = {file = [".config/requirements.in"]}
+optional-dependencies.test = {file = [".config/requirements-test.txt"]}
+optional-dependencies.dev = {file = [".config/requirements-dev.txt"]}
+
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+write_to = "src/chatfx/_version.py"

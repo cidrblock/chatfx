@@ -1,19 +1,17 @@
 """Chat client for AX.25 packet radio networks."""
+
 from __future__ import annotations
 
+import argparse
 import asyncio
-import json
-import logging
 import os
 import sys
 
-from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone
-from enum import Enum
 from pathlib import Path
 
-import smaz
+import tomllib
 
 from aioax25.frame import AX25RawFrame
 from aioax25.interface import AX25Interface
@@ -25,170 +23,48 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
 
-
-TIME_BETWEEN_COMM = 2.0
-LOGGER = logging.getLogger(__name__)
-
-logging.basicConfig(level=logging.CRITICAL)
-
-
-class MessageType(Enum):
-    """Message type enumeration."""
-
-    MSG = 0
-    ACK = 1
-
-    def to_bits(self: MessageType) -> str:
-        """Return the message type as a 2-bit string."""
-        return bin(self.value)[2:].zfill(2)
-
-
-class CompressionType(Enum):
-    """Compression type enumeration."""
-
-    NONE = 0
-    SMAZ = 1
-
-    def to_bits(self: CompressionType) -> str:
-        """Return the compression type as a 2-bit string."""
-        return bin(self.value)[2:].zfill(2)
-
-
-@dataclass
-class MsgId:
-    """Message ID dataclass."""
-
-    id: int
-
-    def __post_init__(self: MsgId) -> None:
-        """Validate the message ID.
-
-        Raises:
-            ValueError: If the message ID is greater than 65535.
-        """
-        max_val = 65535
-        if self.id > max_val:
-            msg = f"id must be less than {max_val}"
-            raise ValueError(msg)
-
-    def to_bytes(self: MsgId) -> bytes:
-        """Return the message ID as a 2-byte array."""
-        return self.id.to_bytes(2)
-
-    @classmethod
-    def from_bytes(cls: type[MsgId], bytes_array: bytearray) -> MsgId:
-        """Return the message ID from a 2-byte array.
-
-        Args:
-            bytes_array: The 2-byte array.
-        """
-        return MsgId(int.from_bytes(bytes_array))
-
-
-@dataclass
-class InfoByte:
-    """Info byte dataclass."""
-
-    message_type: MessageType
-    compression_type: CompressionType
-
-    def to_byte(self: InfoByte) -> bytes:
-        """Return the info byte as a byte."""
-        bits = ""
-        bits += str(self.message_type.to_bits())
-        bits += str(self.compression_type.to_bits())
-        bits = bits.ljust(8, "0")
-        return bytes([int(bits, 2)])
-
-    @classmethod
-    def from_int(cls: type[InfoByte], integer: int) -> InfoByte:
-        """Return the info byte from an integer.
-
-        Args:
-            integer: The integer.
-        Returns:
-            The info byte.
-        """
-        byte_value = integer.to_bytes(1)
-        bits = "".join([bit for byte in byte_value for bit in f"{byte:08b}"])
-        message_type = MessageType(int(bits[0:2]))
-        compression_type = CompressionType(int(bits[2:4]))
-        return InfoByte(message_type, compression_type)
-
-
-@dataclass
-class Message:
-    """Message dataclass."""
-
-    string: str
-    compress: CompressionType = CompressionType.NONE
-
-    def to_bytes(self: Message) -> bytes:
-        """Return the message as a byte array.
-
-        Raises:
-            ValueError: If the compression type is not supported.
-        """
-        if self.compress == CompressionType.SMAZ:
-            compressed: bytes = smaz.compress(self.string)
-            return compressed
-        return self.string.encode()
-
-    @classmethod
-    def from_bytes(
-        cls: type[Message],
-        byte_array: bytearray,
-        compression_type: CompressionType,
-    ) -> Message:
-        """Return the message from a byte array.
-
-        Args:
-            byte_array: The byte array.
-            compression_type: The compression type.
-        Returns:
-            The message.
-        """
-        if compression_type == CompressionType.SMAZ:
-            return Message(smaz.decompress(bytes(byte_array)))
-        return Message(byte_array.decode())
+from .definitions import CompressionType
+from .definitions import InfoByte
+from .definitions import JSONVal
+from .definitions import Message
+from .definitions import MessageType
+from .definitions import MsgId
+from .output import Output
+from .utils import TermFeatures
+from .utils import get_color
 
 
 class Chat:
     """Chat client for AX.25 packet radio networks."""
 
-    def __init__(self: Chat, callsign: str) -> None:
+    def __init__(
+        self: Chat,
+        callsign: str,
+        output: Output,
+        settings: dict[str, JSONVal],
+        time_delay: int,
+    ) -> None:
         """Initialize the chat client.
 
         Args:
             callsign: The callsign to use for the chat client.
         """
+        self.busy: bool = False
         self.callsign: str = callsign
-        self.colors: dict[str, str] = {}
         self.counter: int = 0
         self.device: TCPKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
-        self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
-        self.out_queue: list[AX25RawFrame] = []
         self.last_comm: datetime = datetime.now(timezone.utc)
-        self.busy: bool = False
-        self._load_colors()
-
-    def _load_colors(self: Chat) -> None:
-        """Load the colors from the colors.json file."""
-        file = Path(__file__).parent / "colors.json"
-        with file.open(encoding="utf-8") as f:
-            self.colors = json.load(f)
+        self.out_queue: list[AX25RawFrame] = []
+        self.output = output
+        self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
+        self.settings: dict[str, JSONVal] = settings
+        self.time_delay: int = time_delay
 
     async def build_device(self: Chat) -> TCPKISSDevice:
         """Build the TCPKISSDevice."""
-        self.device = make_device(
-            type="tcp",
-            host="localhost",
-            port=8001,
-            kiss_commands=[],
-            log=LOGGER,
-        )
+        self.device = make_device(type="tcp", host="localhost", port=8001, kiss_commands=[])
         self.device.open()
         await asyncio.sleep(0.1)
         i = 1
@@ -198,13 +74,13 @@ class Chat:
             print(msg, end="\r")  # noqa: T201
             if i > max_attempts:
                 msg = "Cannot connect to direwolf. Is it running?"
-                LOGGER.critical(msg)
+                self.output.critical(msg)
                 sys.exit(1)
 
             await asyncio.sleep(1)
             i += 1
         msg = f"Device: {self.device} opened"
-        LOGGER.info(msg)
+        self.output.info(msg)
 
     def now(self: Chat) -> str:
         """Return the current time in the format: MM/DD/YY HH:MM:SS."""
@@ -227,25 +103,17 @@ class Chat:
             dest: The destination callsign.
             message: The message.
         """
+        colors = self.settings.get("colors", {})
+        if not isinstance(colors, dict):
+            colors = {}
         if indicator == "S":
             scolor = "grey"
             dcolor = "grey"
             mcolor = "grey"
         else:
-            try:
-                scolor = self.colors[source]
-            except KeyError:
-                scolor = "white"
-            try:
-                dcolor = self.colors[dest]
-            except KeyError:
-                dcolor = "white"
-
-            try:
-                mycolor = self.colors[self.callsign]
-            except KeyError:
-                mycolor = "white"
-
+            scolor = get_color(colors, source)
+            dcolor = get_color(colors, dest)
+            mycolor = get_color(colors, self.callsign)
             mcolor = mycolor if source == self.callsign else scolor
 
         pre = f"<grey>{ts} {indicator}\u2502</grey>"
@@ -263,7 +131,7 @@ class Chat:
         """
         self.last_comm = datetime.now(timezone.utc)
         msg = f"Received frame: {frame} on {interface}"
-        LOGGER.debug(msg)
+        self.output.debug(msg)
         info_byte = InfoByte.from_int(frame.frame_payload[0])
         msg_id = MsgId.from_bytes(frame.frame_payload[1:3])
         r_message = Message.from_bytes(frame.frame_payload[3:], info_byte.compression_type)
@@ -271,7 +139,7 @@ class Chat:
         ts = self.now()
 
         msg = f"Received: {ts} {source}: '{r_message.string}'"
-        LOGGER.info(msg)
+        self.output.info(msg)
         if info_byte.message_type == MessageType.MSG:
             self.line_print(ts, "R", source, self.callsign, r_message.string)
             payload = (
@@ -293,7 +161,7 @@ class Chat:
                 ts, counter, source, dest, s_message = self.pending_ack[msg_id.id]
             except KeyError:
                 msg = f"Received ACK for unknown message ID: {msg_id.id}"
-                LOGGER.error(msg)  # noqa: TRY400
+                self.output.error(msg)
                 return
             self.line_print(ts, "A", source, dest, s_message)
             return
@@ -319,11 +187,11 @@ class Chat:
             try:
                 dest, message = line.split(" ", 1)
             except ValueError:
-                LOGGER.error("Invalid message format.")  # noqa: TRY400
+                self.output.error("Invalid message format.")
                 continue
 
             msg = f"Sending: {ts} {dest}: {message}"
-            LOGGER.info(msg)
+            self.output.info(msg)
             payload = (
                 InfoByte(MessageType.MSG, CompressionType.SMAZ).to_byte()
                 + MsgId(self.counter).to_bytes()
@@ -339,7 +207,7 @@ class Chat:
             self.out_queue.append(raw_frame)
 
             msg = f"Sent AX25: {ts} {dest}: {message}"
-            LOGGER.info(msg)
+            self.output.info(msg)
             self.pending_ack[self.counter] = (
                 ts,
                 self.counter,
@@ -358,13 +226,13 @@ class Chat:
             frame: The frame.
         """
         msg = f"Transmit complete: {frame} on {interface}"
-        LOGGER.debug(msg)
+        self.output.debug(msg)
         self.last_comm = datetime.now(timezone.utc)
         self.busy = False
 
     async def process(self: Chat) -> None:
         """Process the interface."""
-        interface = AX25Interface(kissport=self.device[0], log=LOGGER)
+        interface = AX25Interface(kissport=self.device[0], log=self.output.logger)
         interface.bind(callback=self.rx_frame, callsign=self.callsign, ssid=0, regex=False)
 
         while True:
@@ -376,7 +244,7 @@ class Chat:
             if self.busy:
                 await asyncio.sleep(0.1)
                 continue
-            if (datetime.now(timezone.utc) - self.last_comm).seconds < TIME_BETWEEN_COMM:
+            if (datetime.now(timezone.utc) - self.last_comm).seconds < self.time_delay:
                 await asyncio.sleep(0.1)
                 continue
             frame = self.out_queue.pop(0)
@@ -389,14 +257,115 @@ class Chat:
             _task3 = tg.create_task(self.process())
 
 
-def main(callsign: str) -> None:
-    """Run the chat client.
+def arg_parser() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Chatfx - Chat client for AX.25 packet radio networks.",
+    )
+    parser.add_argument(
+        "-c",
+        "--callsign",
+        dest="callsign",
+        help="Your callsign",
+    )
+    parser.add_argument(
+        "-t",
+        "--time-delay",
+        dest="time_delay",
+        help="Time delay between transmissions in seconds. default=2",
+    )
+    parser.add_argument(
+        "-s",
+        "--settings-file",
+        default=argparse.SUPPRESS,
+        dest="settings_file",
+        help="Settings file. default=~/config/chatfx/settings.toml",
+    )
+    parser.add_argument(
+        "--lf",
+        "--log-file <file>",
+        dest="log_file",
+        help="Log file to write to. default=./chatfx.log.",
+    )
+    parser.add_argument(
+        "--ll",
+        "--log-level <level>",
+        dest="log_level",
+        choices=["notset", "debug", "info", "warning", "error", "critical"],
+        help="Log level for file output. default=debug",
+    )
+    parser.add_argument(
+        "--la",
+        "--log-append <bool>",
+        dest="log_append",
+        choices=["true", "false"],
+        help="Append to log file. default=false",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        help="Give more CLI output. Option is additive, and can be used up to 3 times. default=0",
+    )
+    return parser.parse_args()
 
-    Args:
-        callsign: The callsign to use for the chat client.
-    """
-    os.system("clear")  # noqa: S607, S605
-    chat = Chat(callsign=callsign)
+
+def main() -> None:
+    """Run the chat client."""
+    args = vars(arg_parser())
+
+    try:
+        settings_file = Path(args["settings_file"])
+        user_provided = True
+    except KeyError:
+        xdg_cache = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
+        settings_file = xdg_cache / "chatfx" / "settings.toml"
+        user_provided = False
+
+    try:
+        with settings_file.open(mode="rb") as f:
+            settings = tomllib.load(f)
+    except FileNotFoundError:
+        if user_provided:
+            print("User provided settings file does not exist.")  # noqa: T201
+            sys.exit(1)
+    except tomllib.TOMLDecodeError:
+        print("Settings file is corrupted.")  # noqa: T201
+        sys.exit(1)
+
+    callsign = args.get("callsign") or settings.get("callsign", None)
+    log_file = args.get("log_file") or settings.get("log_file", Path.cwd() / "chatfx.log")
+    log_level = args.get("log_level") or settings.get("log_level", "info")
+    log_append = args.get("log_append") or settings.get("log_append", "false")
+    time_delay = args.get("time_delay") or settings.get("time_delay", 2)
+    verbosity = args.get("verbose") or settings.get("verbose", 1)
+
+    output = Output(
+        log_file=log_file,
+        log_level=log_level,
+        log_append=log_append,
+        term_features=TermFeatures(color=True, links=True),
+        verbosity=verbosity,
+    )
+    output.debug("Starting chat client...")
+    output.debug(f"Settings file: {settings_file}")
+    output.debug(f"User provided: {user_provided}")
+    output.debug(f"Callsign: {callsign}")
+    output.debug(f"Log file: {log_file}")
+    output.debug(f"Log level: {log_level}")
+    output.debug(f"Log append: {log_append}")
+    output.debug(f"Time delay: {time_delay}")
+    output.debug(f"Verbosity: {verbosity}")
+
+    if callsign is None:
+        output.error("You must provide a callsign.")
+        sys.exit(1)
+    chat = Chat(
+        callsign=callsign,
+        output=output,
+        settings=settings,
+        time_delay=time_delay,
+    )
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(chat.build_device())
@@ -405,5 +374,4 @@ def main(callsign: str) -> None:
 
 
 if __name__ == "__main__":
-    callsign = sys.argv[1]
-    main(callsign=callsign)
+    main()
