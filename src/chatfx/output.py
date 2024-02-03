@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import TypeVar
 
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit import ANSI
+
 
 if TYPE_CHECKING:
     from .utils import TermFeatures
@@ -333,6 +336,6 @@ class Output:
             with_prefix=True,
         )
         if level in (Level.CRITICAL, Level.ERROR):
-            print("\n".join(lines), file=sys.stderr)  # noqa: T201
+            print(ANSI("\n".join(lines)), file=sys.stderr)
         else:
-            print("\n".join(lines))  # noqa: T201
+            print(ANSI("\n".join(lines)))

@@ -8,6 +8,13 @@ A simple chat application using FX.25.
 pip install https://github.com/cidrblock/chatfx
 ```
 
+## Quick start
+
+```
+chatfx -c MYCALL
+> YOURCALL hello world
+```
+
 ## Usage
 
 The application settings can be provided on the command line or with a settings file.
