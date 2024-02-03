@@ -2,11 +2,74 @@
 
 A simple chat application using FX.25.
 
+## Installation
+
+```
+pip install https://github.com/cidrblock/chatfx
+```
+
+## Usage
+
+The application settings can be provided on the command line or with a settings file.
+
+The command line parameters can be found using `--help`.
+
+```
+$ chatfx --help
+usage: chatfx [-h] [-c CALLSIGN] [-k HOST] [-p PORT] [-t TIME_DELAY] [-s SETTINGS_FILE] [--lf LOG_FILE] [--ll {notset,debug,info,warning,error,critical}]
+              [--la {true,false}] [-v]
+
+Chatfx - Chat client for AX.25 packet radio networks.
+
+options:
+  -h, --help            show this help message and exit
+  -c CALLSIGN, --callsign CALLSIGN
+                        Your callsign
+  -k HOST, --kiss-host HOST
+                        The kiss host. default=localhost
+  -p PORT, --port PORT  The port on the kiss host. default=8001
+  -t TIME_DELAY, --time-delay TIME_DELAY
+                        Time delay between transmissions in seconds. default=2
+  -s SETTINGS_FILE, --settings-file SETTINGS_FILE
+                        Settings file. default=~/config/chatfx/settings.toml
+  --lf LOG_FILE, --log-file <file> LOG_FILE
+                        Log file to write to. default=./chatfx.log.
+  --ll {notset,debug,info,warning,error,critical}, --log-level <level> {notset,debug,info,warning,error,critical}
+                        Log level for file output. default=debug
+  --la {true,false}, --log-append <bool> {true,false}
+                        Append to log file. default=false
+  -v, --verbose         Give more CLI output. Option is additive, and can be used up to 3 times. default=0
+```
+
+Using a settings file is an alternative to providing the settings at the command line.  The settings file should be stored in the `$XDG_CONFIG_HOME/chatfx` (typically `/home/username/.config/chatfx`) and called `settings.toml`.
+
+A sample settings file follows:
+
+```toml
+callsign = "RB1"
+callsign = "RB1"
+host = "localhost"
+port = 8001
+log-file = "/tmp/chatfx.log"
+log-append = "false"
+log-level = "debug"
+time-delay = 2
+verbose = 3
+
+
+[colors]
+rb1 = "Aqua"
+rb2 = "YellowGreen"
+```
+
+Note: See the colors section below for a description of the colors section.
+
+
 ## Direwolf
 
 Install direwolf (fedora)
 
-```
+```bash
 sudo usermod -a -G audio <your account>
 
 sudo dnf install git gcc gcc-c++ make alsa-lib-devel libudev-devel avahi-devel cmake3 -y
@@ -45,6 +108,18 @@ direwolf -d x -t 0 -X 1
 
 
 ## Colors
+
+Terminal output can be colored based on both sender and receiver callsign.  The color mapping cannot be provided on the command line and needs to be provided in the settings file.  Each line in the `colors` sections of the settings file is a mapping between call sign and terminal color.
+
+Sample:
+
+```toml
+[colors]
+ABCD = AliceBlue
+BCDE = AntiqueWhite
+```
+
+The available colors are provided below:
 
 ```
 AliceBlue

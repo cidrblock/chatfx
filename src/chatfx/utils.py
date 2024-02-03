@@ -23,7 +23,7 @@ class TermFeatures:
 
 
 def ci_get(
-    dictionary: dict[str, JSONVal],
+    dictionary: dict[str, str],
     key: str,
     default: None = None,
 ) -> JSONVal:
@@ -35,7 +35,7 @@ def ci_get(
 
 
 def get_color(
-    dictionary: dict[str, JSONVal],
+    dictionary: dict[str, str],
     key: str,
     default: str = "white",
 ) -> str:

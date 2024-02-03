@@ -24,8 +24,8 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from .definitions import CompressionType
+from .definitions import Config
 from .definitions import InfoByte
-from .definitions import JSONVal
 from .definitions import Message
 from .definitions import MessageType
 from .definitions import MsgId
@@ -39,10 +39,8 @@ class Chat:
 
     def __init__(
         self: Chat,
-        callsign: str,
+        config: Config,
         output: Output,
-        settings: dict[str, JSONVal],
-        time_delay: int,
     ) -> None:
         """Initialize the chat client.
 
@@ -50,7 +48,7 @@ class Chat:
             callsign: The callsign to use for the chat client.
         """
         self.busy: bool = False
-        self.callsign: str = callsign
+        self.config: Config = config
         self.counter: int = 0
         self.device: TCPKISSDevice
         self.exit: bool = False
@@ -59,12 +57,15 @@ class Chat:
         self.out_queue: list[AX25RawFrame] = []
         self.output = output
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
-        self.settings: dict[str, JSONVal] = settings
-        self.time_delay: int = time_delay
 
     async def build_device(self: Chat) -> TCPKISSDevice:
         """Build the TCPKISSDevice."""
-        self.device = make_device(type="tcp", host="localhost", port=8001, kiss_commands=[])
+        self.device = make_device(
+            type="tcp",
+            host=self.config.host,
+            port=self.config.port,
+            kiss_commands=[],
+        )
         self.device.open()
         await asyncio.sleep(0.1)
         i = 1
@@ -103,18 +104,15 @@ class Chat:
             dest: The destination callsign.
             message: The message.
         """
-        colors = self.settings.get("colors", {})
-        if not isinstance(colors, dict):
-            colors = {}
         if indicator == "S":
             scolor = "grey"
             dcolor = "grey"
             mcolor = "grey"
         else:
-            scolor = get_color(colors, source)
-            dcolor = get_color(colors, dest)
-            mycolor = get_color(colors, self.callsign)
-            mcolor = mycolor if source == self.callsign else scolor
+            scolor = get_color(self.config.colors, source)
+            dcolor = get_color(self.config.colors, dest)
+            mycolor = get_color(self.config.colors, self.config.callsign)
+            mcolor = mycolor if source == self.config.callsign else scolor
 
         pre = f"<grey>{ts} {indicator}\u2502</grey>"
         source = f"<{scolor}>{source}</{scolor}>"
@@ -141,7 +139,7 @@ class Chat:
         msg = f"Received: {ts} {source}: '{r_message.string}'"
         self.output.info(msg)
         if info_byte.message_type == MessageType.MSG:
-            self.line_print(ts, "R", source, self.callsign, r_message.string)
+            self.line_print(ts, "R", source, self.config.callsign, r_message.string)
             payload = (
                 InfoByte(MessageType.ACK, CompressionType.SMAZ).to_byte()
                 + MsgId(msg_id.id).to_bytes()
@@ -150,7 +148,7 @@ class Chat:
 
             raw_frame = AX25RawFrame(
                 destination=source,
-                source=self.callsign,
+                source=self.config.callsign,
                 control=0,
                 payload=payload,
             )
@@ -200,7 +198,7 @@ class Chat:
 
             raw_frame = AX25RawFrame(
                 destination=dest,
-                source=self.callsign,
+                source=self.config.callsign,
                 control=0,
                 payload=payload,
             )
@@ -211,11 +209,11 @@ class Chat:
             self.pending_ack[self.counter] = (
                 ts,
                 self.counter,
-                self.callsign,
+                self.config.callsign,
                 dest,
                 message,
             )
-            self.line_print(ts, "S", self.callsign, dest, message)
+            self.line_print(ts, "S", self.config.callsign, dest, message)
             self.counter += 1
 
     def tx_complete(self: Chat, interface: AX25Interface, frame: AX25RawFrame) -> None:
@@ -232,8 +230,16 @@ class Chat:
 
     async def process(self: Chat) -> None:
         """Process the interface."""
-        interface = AX25Interface(kissport=self.device[0], log=self.output.logger)
-        interface.bind(callback=self.rx_frame, callsign=self.callsign, ssid=0, regex=False)
+        interface = AX25Interface(
+            kissport=self.device[0],
+            log=self.output.logger,
+        )
+        interface.bind(
+            callback=self.rx_frame,
+            callsign=self.config.callsign,
+            ssid=0,
+            regex=False,
+        )
 
         while True:
             if self.exit:
@@ -244,7 +250,7 @@ class Chat:
             if self.busy:
                 await asyncio.sleep(0.1)
                 continue
-            if (datetime.now(timezone.utc) - self.last_comm).seconds < self.time_delay:
+            if (datetime.now(timezone.utc) - self.last_comm).seconds < self.config.time_delay:
                 await asyncio.sleep(0.1)
                 continue
             frame = self.out_queue.pop(0)
@@ -267,6 +273,19 @@ def arg_parser() -> argparse.Namespace:
         "--callsign",
         dest="callsign",
         help="Your callsign",
+    )
+    parser.add_argument(
+        "-k",
+        "--kiss-host",
+        dest="host",
+        help="The kiss host. default=localhost",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        dest="port",
+        type=int,
+        help="The port on the kiss host. default=8001",
     )
     parser.add_argument(
         "-t",
@@ -333,38 +352,33 @@ def main() -> None:
         print("Settings file is corrupted.")  # noqa: T201
         sys.exit(1)
 
-    callsign = args.get("callsign") or settings.get("callsign", None)
-    log_file = args.get("log_file") or settings.get("log_file", Path.cwd() / "chatfx.log")
-    log_level = args.get("log_level") or settings.get("log_level", "info")
-    log_append = args.get("log_append") or settings.get("log_append", "false")
-    time_delay = args.get("time_delay") or settings.get("time_delay", 2)
-    verbosity = args.get("verbose") or settings.get("verbose", 1)
+    config = Config(
+        callsign=args.get("callsign") or settings.get("callsign", None),
+        colors=settings.get("colors", {}),
+        host=args.get("host") or settings.get("host", "localhost"),
+        log_file=args.get("log_file") or settings.get("log_file", Path.cwd() / "chatfx.log"),
+        log_level=args.get("log_level") or settings.get("log_level", "info"),
+        log_append=args.get("log_append") or settings.get("log_append", "false"),
+        port=args.get("port") or settings.get("port", 8001),
+        time_delay=args.get("time_delay") or settings.get("time_delay", 2),
+        verbose=args.get("verbose") or settings.get("verbose", 1),
+    )
 
     output = Output(
-        log_file=log_file,
-        log_level=log_level,
-        log_append=log_append,
+        log_file=config.log_file,
+        log_level=config.log_level,
+        log_append=config.log_append,
         term_features=TermFeatures(color=True, links=True),
-        verbosity=verbosity,
+        verbosity=config.verbose,
     )
     output.debug("Starting chat client...")
-    output.debug(f"Settings file: {settings_file}")
-    output.debug(f"User provided: {user_provided}")
-    output.debug(f"Callsign: {callsign}")
-    output.debug(f"Log file: {log_file}")
-    output.debug(f"Log level: {log_level}")
-    output.debug(f"Log append: {log_append}")
-    output.debug(f"Time delay: {time_delay}")
-    output.debug(f"Verbosity: {verbosity}")
-
-    if callsign is None:
+    output.debug(f"Configuration: {config}")
+    if config.callsign is None:
         output.error("You must provide a callsign.")
         sys.exit(1)
     chat = Chat(
-        callsign=callsign,
+        config=config,
         output=output,
-        settings=settings,
-        time_delay=time_delay,
     )
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

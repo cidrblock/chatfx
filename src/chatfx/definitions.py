@@ -12,6 +12,35 @@ import smaz
 JSONVal = Union[None, bool, str, float, int, list["JSONVal"], dict[str, "JSONVal"]]
 
 
+@dataclass
+class Config:
+    """The application configuration."""
+
+    callsign: str
+    colors: dict[str, str]
+    host: str
+    log_file: str
+    log_level: str
+    log_append: str
+    port: int
+    time_delay: int
+    verbose: int
+
+    def __str__(self: Config) -> str:
+        """Return the configuration as a string."""
+        return (
+            "\n"
+            f"\tcallsign: {self.callsign}\n"
+            f"\thost: {self.host}\n"
+            f"\tlog_file: {self.log_file}\n"
+            f"\tlog_level: {self.log_level}\n"
+            f"\tlog_append: {self.log_append}\n"
+            f"\tport: {self.port}\n"
+            f"\ttime_delay: {self.time_delay}\n"
+            f"\tverbosity: {self.verbose}"
+        )
+
+
 class MessageType(Enum):
     """Message type enumeration."""
 
