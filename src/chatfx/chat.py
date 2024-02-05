@@ -10,7 +10,7 @@ from datetime import datetime
 from datetime import timezone
 from typing import TYPE_CHECKING
 
-from aioax25.frame import AX25RawFrame
+from aioax25.frame import AX25UnnumberedInformationFrame
 from aioax25.interface import AX25Interface
 from aioax25.kiss import KISSDeviceState
 from aioax25.kiss import TCPKISSDevice
@@ -32,6 +32,7 @@ from .utils import get_color
 if TYPE_CHECKING:
     from .output import Output
 
+
 class Chat:
     """Chat client for AX.25 packet radio networks."""
 
@@ -50,7 +51,7 @@ class Chat:
         self.device: TCPKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
-        self.out_queue: list[AX25RawFrame] = []
+        self.out_queue: list[AX25UnnumberedInformationFrame] = []
         self.output = output
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
 
@@ -116,7 +117,11 @@ class Chat:
         message = f"<{mcolor}>{message}</{mcolor}>"
         print_formatted_text(HTML(f"{pre}{source}>{dest} {message}"))
 
-    def rx_frame(self: Chat, interface: AX25Interface, frame: AX25RawFrame) -> None:
+    def rx_frame(
+        self: Chat,
+        interface: AX25Interface,
+        frame: AX25UnnumberedInformationFrame,
+    ) -> None:
         """Receive a frame.
 
         Args:
@@ -141,11 +146,11 @@ class Chat:
                 + Message(string="").to_bytes()
             )
 
-            raw_frame = AX25RawFrame(
+            raw_frame = AX25UnnumberedInformationFrame(
                 destination=source,
                 source=self.config.callsign,
-                control=0,
                 payload=payload,
+                pid=0xF0,
             )
             self.out_queue.append(raw_frame)
             return
@@ -192,11 +197,11 @@ class Chat:
                 + Message(string=message, compress=CompressionType.SMAZ).to_bytes()
             )
 
-            raw_frame = AX25RawFrame(
+            raw_frame = AX25UnnumberedInformationFrame(
                 destination=dest,
                 source=self.config.callsign,
-                control=0,
                 payload=payload,
+                pid=0xF0,
             )
             self.out_queue.append(raw_frame)
 
@@ -212,7 +217,11 @@ class Chat:
             self.line_print(ts, "S", self.config.callsign, dest, message)
             self.counter += 1
 
-    def tx_complete(self: Chat, interface: AX25Interface, frame: AX25RawFrame) -> None:
+    def tx_complete(
+        self: Chat,
+        interface: AX25Interface,
+        frame: AX25UnnumberedInformationFrame,
+    ) -> None:
         """Transmit complete callback.
 
         Args:
