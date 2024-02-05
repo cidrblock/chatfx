@@ -196,6 +196,7 @@ class Chat:
                 + MsgId(self.counter).to_bytes()
                 + Message(string=message, compress=CompressionType.SMAZ).to_bytes()
             )
+            self.output.debug(f"Payload length: {len(payload)} bytes")
 
             raw_frame = AX25UnnumberedInformationFrame(
                 destination=dest,
