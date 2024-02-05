@@ -180,10 +180,6 @@ class Chat:
             if line == "/clear":
                 os.system("clear")  # noqa: ASYNC102, S607, S605
                 continue
-            if line == "/connect":
-                self.device._close()  # noqa: SLF001
-                await self.build_device()
-                continue
 
             ts = self.now()
             try:
