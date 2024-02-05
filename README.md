@@ -95,8 +95,13 @@ Add a ~/direwolf.conf
 
 ```
 ADEVICE plughw:1,0
+CHANNEL 0
 ARATE 48000
+DWAIT 10
+IL2PTX +1
 MODEM 1200 1200:2200
+PTT CM108
+TXDELAY 60
 ```
 
 The `ADEVICE` refers to the soundcard found using `aplay`
@@ -276,6 +281,10 @@ YellowGreen
 ```
 
 ## Payload format
+
+Byte 0
+
+- PID (No Layer 3 protocol)
 
 Byte 1
 
