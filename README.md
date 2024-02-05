@@ -110,7 +110,7 @@ direwolf -t 0 -X 1
 for more verbose output from direwolf
 
 ```
-direwolf -d x -t 0 -X 1
+direwolf -d x2o -t 0 -q d
 ```
 
 ## Colors

@@ -115,7 +115,7 @@ def main() -> None:
         log_level=args.get("log_level") or settings.get("log_level", "info"),
         log_append=args.get("log_append") or settings.get("log_append", "false"),
         port=args.get("port") or settings.get("port", 8001),
-        time_delay=float(args.get("time_delay") or settings.get("time_delay", 2)),
+        time_delay=float(args.get("time_delay") or settings.get("time_delay", 3)),
         verbose=args.get("verbose") or settings.get("verbose", 1),
     )
 
