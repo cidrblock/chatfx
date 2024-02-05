@@ -130,9 +130,9 @@ class Chat:
         """
         msg = f"Received frame: {frame} on {interface}"
         self.output.debug(msg)
-        info_byte = InfoByte.from_int(frame.frame_payload[0])
-        msg_id = MsgId.from_bytes(frame.frame_payload[1:3])
-        r_message = Message.from_bytes(frame.frame_payload[3:], info_byte.compression_type)
+        info_byte = InfoByte.from_int(frame.frame_payload[1])
+        msg_id = MsgId.from_bytes(frame.frame_payload[2:4])
+        r_message = Message.from_bytes(frame.frame_payload[4:], info_byte.compression_type)
         source = str(frame.header.source).strip().replace("*", "")
         ts = self.now()
 
