@@ -54,7 +54,6 @@ A sample settings file follows:
 
 ```toml
 callsign = "RB1"
-callsign = "RB1"
 host = "localhost"
 port = 8001
 log-file = "/tmp/chatfx.log"

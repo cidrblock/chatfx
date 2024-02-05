@@ -174,10 +174,10 @@ class Chat:
                 except KeyboardInterrupt:
                     line = "/quit"
             print("\033[1A", end="\r")  # noqa: T201
-            if line == "/quit":
+            if line in ("/quit", "/q"):
                 self.exit = True
                 return
-            if line == "/clear":
+            if line in ("/clear", "/c", "/cls"):
                 os.system("clear")  # noqa: ASYNC102, S607, S605
                 continue
 
