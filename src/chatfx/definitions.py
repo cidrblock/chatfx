@@ -23,7 +23,7 @@ class Config:
     log_level: str
     log_append: str
     port: int
-    time_delay: int
+    time_delay: float
     verbose: int
 
     def __str__(self: Config) -> str:
