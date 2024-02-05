@@ -45,13 +45,11 @@ class Chat:
         Args:
             callsign: The callsign to use for the chat client.
         """
-        self.busy: bool = False
         self.config: Config = config
         self.counter: int = 0
         self.device: TCPKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
-        self.last_comm: datetime = datetime.now(timezone.utc)
         self.out_queue: list[AX25RawFrame] = []
         self.output = output
         self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
@@ -125,7 +123,6 @@ class Chat:
             interface: The interface.
             frame: The frame.
         """
-        self.last_comm = datetime.now(timezone.utc)
         msg = f"Received frame: {frame} on {interface}"
         self.output.debug(msg)
         info_byte = InfoByte.from_int(frame.frame_payload[0])
@@ -224,14 +221,13 @@ class Chat:
         """
         msg = f"Transmit complete: {frame} on {interface}"
         self.output.debug(msg)
-        self.last_comm = datetime.now(timezone.utc)
-        self.busy = False
 
     async def process(self: Chat) -> None:
         """Process the interface."""
         interface = AX25Interface(
             kissport=self.device[0],
             log=self.output.logger,
+            cts_delay=self.config.time_delay,
         )
         interface.bind(
             callback=self.rx_frame,
@@ -244,12 +240,6 @@ class Chat:
             if self.exit:
                 return
             if len(self.out_queue) == 0:
-                await asyncio.sleep(0.1)
-                continue
-            if self.busy:
-                await asyncio.sleep(0.1)
-                continue
-            if (datetime.now(timezone.utc) - self.last_comm).seconds < self.config.time_delay:
                 await asyncio.sleep(0.1)
                 continue
             frame = self.out_queue.pop(0)
