@@ -95,6 +95,7 @@ def main() -> None:
         settings_file = xdg_cache / "chatfx" / "settings.toml"
         user_provided = False
 
+    settings = {}
     try:
         with settings_file.open(mode="rb") as f:
             settings = tomllib.load(f)

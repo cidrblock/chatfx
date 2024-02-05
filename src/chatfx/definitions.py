@@ -42,7 +42,7 @@ class Config:
 
 
 class MessageType(Enum):
-    """Message type enumeration."""
+    """Message type enumeration. (0-3)."""
 
     MSG = 0
     ACK = 1
@@ -53,7 +53,7 @@ class MessageType(Enum):
 
 
 class CompressionType(Enum):
-    """Compression type enumeration."""
+    """Compression type enumeration. (0-3)."""
 
     NONE = 0
     SMAZ = 1

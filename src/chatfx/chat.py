@@ -26,13 +26,11 @@ from .definitions import InfoByte
 from .definitions import Message
 from .definitions import MessageType
 from .definitions import MsgId
-from .output import Output
 from .utils import get_color
 
 
 if TYPE_CHECKING:
     from .output import Output
-
 
 class Chat:
     """Chat client for AX.25 packet radio networks."""
@@ -156,7 +154,7 @@ class Chat:
             return
         if info_byte.message_type == MessageType.ACK:
             try:
-                ts, counter, source, dest, s_message = self.pending_ack[msg_id.id]
+                ts, _counter, source, dest, s_message = self.pending_ack[msg_id.id]
             except KeyError:
                 msg = f"Received ACK for unknown message ID: {msg_id.id}"
                 self.output.error(msg)

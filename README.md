@@ -48,7 +48,7 @@ options:
   -v, --verbose         Give more CLI output. Option is additive, and can be used up to 3 times. default=0
 ```
 
-Using a settings file is an alternative to providing the settings at the command line.  The settings file should be stored in the `$XDG_CONFIG_HOME/chatfx` (typically `/home/username/.config/chatfx`) and called `settings.toml`.
+Using a settings file is an alternative to providing the settings at the command line. The settings file should be stored in the `$XDG_CONFIG_HOME/chatfx` (typically `/home/username/.config/chatfx`) and called `settings.toml`.
 
 A sample settings file follows:
 
@@ -71,7 +71,6 @@ rb2 = "YellowGreen"
 
 Note: See the colors section below for a description of the colors section.
 
-
 ## Direwolf
 
 Install direwolf (fedora)
@@ -92,16 +91,18 @@ sudo make install
 make install-conf
 ```
 
-
 Add a ~/direwolf.conf
+
 ```
 ADEVICE plughw:1,0
 ARATE 48000
 MODEM 1200 1200:2200
 ```
+
 The `ADEVICE` refers to the soundcard found using `aplay`
 
 Run direwolf
+
 ```
 direwolf -t 0 -X 1
 ```
@@ -112,11 +113,9 @@ for more verbose output from direwolf
 direwolf -d x -t 0 -X 1
 ```
 
-
-
 ## Colors
 
-Terminal output can be colored based on both sender and receiver callsign.  The color mapping cannot be provided on the command line and needs to be provided in the settings file.  Each line in the `colors` sections of the settings file is a mapping between call sign and terminal color.
+Terminal output can be colored based on both sender and receiver callsign. The color mapping cannot be provided on the command line and needs to be provided in the settings file. Each line in the `colors` sections of the settings file is a mapping between call sign and terminal color.
 
 Sample:
 
@@ -273,8 +272,24 @@ Wheat
 White
 WhiteSmoke
 Yellow
-YellowGreen 
+YellowGreen
 ```
+
+## Payload format
+
+Byte 1
+
+- 2 bits - Message type
+- 2 bits - Compression type
+- 4 bits - Reserved
+
+Bytes 2-3
+
+- 16 bits - Message ID
+
+Bytes 4+
+
+- nn bytes - Message
 
 ## Other notes
 
@@ -284,11 +299,12 @@ To disable HUD for a USB to audio adapter
 lsusb
 lsusb -t
 sudo more /sys/bus/usb/devices/1-12/1-12:1.3/authorized
-sudo vi /etc/udev/rules.d/99-usb-audio.rules 
-ACTION=="add", ATTR{idVendor}=="001f", ATTR{idProduct}=="0b21", RUN+="/bin/sh -c 'echo 0 > /sys$DEVPATH/`basename $DEVPATH`:1.3/authorized'" 
+sudo vi /etc/udev/rules.d/99-usb-audio.rules
+ACTION=="add", ATTR{idVendor}=="001f", ATTR{idProduct}=="0b21", RUN+="/bin/sh -c 'echo 0 > /sys$DEVPATH/`basename $DEVPATH`:1.3/authorized'"
 ```
 
 To disable gdm sleep
+
 ```
 sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
 ```
