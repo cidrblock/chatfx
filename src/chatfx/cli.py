@@ -111,11 +111,11 @@ def main() -> None:
         callsign=args.get("callsign") or settings.get("callsign", None),
         colors=settings.get("colors", {}),
         host=args.get("host") or settings.get("host", "localhost"),
-        log_file=args.get("log_file") or settings.get("log_file", Path.cwd() / "chatfx.log"),
-        log_level=args.get("log_level") or settings.get("log_level", "info"),
-        log_append=args.get("log_append") or settings.get("log_append", "false"),
+        log_file=args.get("log_file") or settings.get("log-file", Path.cwd() / "chatfx.log"),
+        log_level=args.get("log_level") or settings.get("log-level", "info"),
+        log_append=args.get("log_append") or settings.get("log-append", "false"),
         port=args.get("port") or settings.get("port", 8001),
-        time_delay=float(args.get("time_delay") or settings.get("time_delay", 3)),
+        time_delay=float(args.get("time_delay") or settings.get("time-delay", 3)),
         verbose=args.get("verbose") or settings.get("verbose", 1),
     )
 
