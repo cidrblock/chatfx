@@ -1,5 +1,6 @@
 """Run the chatfx application."""
 import asyncio
+import curses
 import os
 import sys
 
@@ -47,7 +48,7 @@ async def start() -> None:
         sys.exit(1)
 
     config = Config(
-        callsign=args.get("callsign") or settings.get("callsign", None),
+        callsign=args.get("callsign") or settings.get("callsign", "N0CALL"),
         colors=settings.get("colors", {}),
         host=args.get("host") or settings.get("host", "localhost"),
         log_file=args.get("log_file") or settings.get("log-file", Path.cwd() / "chatfx.log"),
@@ -70,9 +71,6 @@ async def start() -> None:
         ui_output=ui.output,
         ui_refresh=ui.refresh,
     )
-    if config.callsign is None:
-        output.error("You must provide a callsign.")
-        sys.exit(1)
 
     chat = Chat(
         config=config,

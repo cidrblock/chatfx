@@ -1,0 +1,27 @@
+FROM registry.fedoraproject.org/fedora:latest
+
+RUN dnf -y update && \
+    dnf -y install git gcc gcc-c++ make alsa-lib-devel \
+           libudev-devel avahi-devel cmake3 alsa-utils \
+           python3 python3-pip && \
+    dnf clean all && \
+    rm -rf /var/cache /var/log/dnf* /var/log/yum.*
+
+RUN git clone https://www.github.com/wb2osz/direwolf && \
+    cd direwolf && \
+    mkdir build && cd build && \
+    cmake .. && \
+    make -j4 && \
+    sudo make install
+
+# COPY . $HOME/src/chatfx/
+# WORKDIR $HOME/src/chatfx/
+# RUN python3 -m pip install .
+
+RUN python3 -m pip install https://github.com/cidrblock/chatfx
+
+ENV DIREWOLF_PARAMS="-d x2o -t 0 -q d -c /etc/direwolf.conf"
+ENV CHATFX_PARAMS="-s /etc/chatfx.toml"
+ENV TERM=xterm-256color
+
+CMD nohup /usr/local/bin/direwolf ${DIREWOLF_PARAMS} &> direwolf.log & chatfx ${CHATFX_PARAMS}
