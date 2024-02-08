@@ -15,5 +15,5 @@ jobs:
 
       - name: Build the image
         run: |
-          docker build -f '$GITHUB_WORKSPACE/podman/Containerfile' --tag ghcr.io/cidrblock/chatfx:latest
+          docker build --file $GITHUB_WORKSPACE/podman/Containerfile --tag ghcr.io/cidrblock/chatfx:latest
           docker push ghcr.io/cidrblock/chatfx:latest
