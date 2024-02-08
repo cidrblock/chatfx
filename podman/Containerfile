@@ -18,7 +18,7 @@ RUN git clone https://www.github.com/wb2osz/direwolf && \
 # WORKDIR $HOME/src/chatfx/
 # RUN python3 -m pip install .
 
-RUN python3 -m pip install https://github.com/cidrblock/chatfx
+RUN python3 -m pip install git+https://github.com/cidrblock/chatfx.git
 
 ENV DIREWOLF_PARAMS="-d x2o -t 0 -q d -c /etc/direwolf.conf"
 ENV CHATFX_PARAMS="-s /etc/chatfx.toml"
