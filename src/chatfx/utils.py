@@ -2,48 +2,65 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+import decimal
+
+from datetime import datetime
+from datetime import timezone
 
 
-if TYPE_CHECKING:
-    from .definitions import JSONVal
+def now() -> str:
+    """Return the current time."""
+    return datetime.now(timezone.utc).astimezone()
 
 
-@dataclass
-class TermFeatures:
-    """Terminal features."""
-
-    color: bool
-    links: bool
-
-    def any_enabled(self: TermFeatures) -> bool:
-        """Return True if any features are enabled."""
-        return any((self.color, self.links))
+def ts_full(time_stamp: datetime.datetime) -> str:
+    """Return the current date."""
+    return time_stamp.strftime("%m/%d/%y %H:%M:%S")
 
 
-def ci_get(
-    dictionary: dict[str, str],
-    key: str,
-    default: None = None,
-) -> JSONVal:
-    """Get a value from a dictionary with case-insensitive keys."""
-    for k, v in dictionary.items():
-        if k.lower() == key.lower():
-            return v
-    return default
+def ts_time(time_stamp: datetime.datetime) -> str:
+    """Return the current time."""
+    return time_stamp.strftime("%H:%M:%S")
 
 
-def get_color(
-    dictionary: dict[str, str],
-    key: str,
-    default: str = "white",
-) -> str:
-    """Get a color from a dictionary."""
-    value = ci_get(dictionary, key)
-    if value is None:
-        return default
-    if not isinstance(value, str):
-        msg = f"Expected string for color, got {value!r}"
-        raise TypeError(msg)
-    return value
+def round_half_up(number: float) -> int:
+    """Round a number to the nearest integer with ties going away from zero.
+
+    This is different the round() where exact halfway cases are rounded to the nearest
+    even result instead of away from zero. (e.g. round(2.5) = 2, round(3.5) = 4).
+
+    This will always round based on distance from zero. (e.g round(2.5) = 3, round(3.5) = 4).
+
+    :param number: The number to round
+    :returns: The rounded number as an it
+    """
+    rounded = decimal.Decimal(number).quantize(
+        decimal.Decimal("1"),
+        rounding=decimal.ROUND_HALF_UP,
+    )
+    return int(rounded)
+
+
+def scaled_width(width: int) -> int:
+    """Get a sliding scale screen width.
+
+    :returns: The console width
+    """
+    s_max = 2160
+    p_at_max = 0.80
+
+    r1 = s_max / width
+    r2 = p_at_max / r1
+    s = 1 - r2
+    return round_half_up(width * s)
+
+
+def scale_for_curses(rgb_value: int) -> int:
+    """Scale a single RGB value for curses.
+
+    :param rgb_value: One RGB value
+    :returns: The value scaled for curses
+    """
+    curses_ceiling = 1000
+    rgb_ceiling = 255
+    return int(rgb_value * curses_ceiling / rgb_ceiling)

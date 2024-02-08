@@ -3,30 +3,27 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 
 from datetime import datetime
 from datetime import timezone
 from typing import TYPE_CHECKING
+from typing import Callable
 
 from aioax25.frame import AX25UnnumberedInformationFrame
 from aioax25.interface import AX25Interface
 from aioax25.kiss import KISSDeviceState
 from aioax25.kiss import TCPKISSDevice
 from aioax25.kiss import make_device
-from prompt_toolkit import HTML
-from prompt_toolkit import PromptSession
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.patch_stdout import patch_stdout
 
-from .definitions import CompressionType
-from .definitions import Config
-from .definitions import InfoByte
-from .definitions import Message
-from .definitions import MessageType
-from .definitions import MsgId
-from .utils import get_color
+from chatfx.definitions import CompressionType
+from chatfx.definitions import Config
+from chatfx.definitions import FormattedMsg
+from chatfx.definitions import FormattedText
+from chatfx.definitions import InfoByte
+from chatfx.definitions import Message
+from chatfx.definitions import MessageType
+from chatfx.definitions import MsgId
 
 
 if TYPE_CHECKING:
@@ -40,6 +37,8 @@ class Chat:
         self: Chat,
         config: Config,
         output: Output,
+        ui_output: list[FormattedMsg | FormattedText],
+        ui_refresh: Callable[[], None],
     ) -> None:
         """Initialize the chat client.
 
@@ -53,7 +52,8 @@ class Chat:
         self.interface: AX25Interface
         self.out_queue: list[AX25UnnumberedInformationFrame] = []
         self.output = output
-        self.pending_ack: dict[int, tuple[str, int, str, str, str]] = {}
+        self.ui_output = ui_output
+        self.ui_refresh = ui_refresh
 
     async def build_device(self: Chat) -> TCPKISSDevice:
         """Build the TCPKISSDevice."""
@@ -82,40 +82,7 @@ class Chat:
 
     def now(self: Chat) -> str:
         """Return the current time in the format: MM/DD/YY HH:MM:SS."""
-        return datetime.now(timezone.utc).astimezone().strftime("%m/%d/%y %H:%M:%S")
-
-    def line_print(  # noqa: PLR0913
-        self: Chat,
-        ts: str,
-        indicator: str,
-        source: str,
-        dest: str,
-        message: str,
-    ) -> None:
-        """Print a line to the terminal.
-
-        Args:
-            ts: The timestamp.
-            indicator: The indicator.
-            source: The source callsign.
-            dest: The destination callsign.
-            message: The message.
-        """
-        if indicator == "S":
-            scolor = "grey"
-            dcolor = "grey"
-            mcolor = "grey"
-        else:
-            scolor = get_color(self.config.colors, source)
-            dcolor = get_color(self.config.colors, dest)
-            mycolor = get_color(self.config.colors, self.config.callsign)
-            mcolor = mycolor if source == self.config.callsign else scolor
-
-        pre = f"<grey>{ts} {indicator}\u2502</grey>"
-        source = f"<{scolor}>{source}</{scolor}>"
-        dest = f"<{dcolor}>{dest}</{dcolor}>"
-        message = f"<{mcolor}>{message}</{mcolor}>"
-        print_formatted_text(HTML(f"{pre}{source}>{dest} {message}"))
+        return datetime.now(timezone.utc).astimezone()
 
     def rx_frame(
         self: Chat,
@@ -139,7 +106,17 @@ class Chat:
         msg = f"Received: {ts} {source}: '{r_message.string}'"
         self.output.info(msg)
         if info_byte.message_type == MessageType.MSG:
-            self.line_print(ts, "R", source, self.config.callsign, r_message.string)
+            fmsg = FormattedMsg(
+                colors=self.config.colors,
+                counter=msg_id.id,
+                timestamp=ts,
+                indicator="R",
+                source=source,
+                destination=self.config.callsign,
+                message=r_message.string,
+            )
+            self.ui_output.append(fmsg)
+            self.ui_refresh()
             payload = (
                 InfoByte(MessageType.ACK, CompressionType.SMAZ).to_byte()
                 + MsgId(msg_id.id).to_bytes()
@@ -152,71 +129,73 @@ class Chat:
                 payload=payload,
                 pid=0xF0,
             )
+            self.output.debug(f"ACKing message ID: {msg_id.id} from {source}")
             self.out_queue.append(raw_frame)
             return
         if info_byte.message_type == MessageType.ACK:
-            try:
-                ts, _counter, source, dest, s_message = self.pending_ack[msg_id.id]
-            except KeyError:
+            found = [
+                idx
+                for idx, x in enumerate(self.ui_output)
+                if isinstance(x, FormattedMsg)
+                and x.counter == msg_id.id
+                and x.source == self.config.callsign
+            ]
+            if len(found) == 0:
                 msg = f"Received ACK for unknown message ID: {msg_id.id}"
                 self.output.error(msg)
                 return
-            self.line_print(ts, "A", source, dest, s_message)
+            if len(found) > 1:
+                msg = f"Received ACK for message ID: {msg_id.id} multiple times"
+                self.output.error(msg)
+                return
+            self.ui_output[found[0]].indicator = "A"
+            self.ui_refresh()
             return
 
-    async def send(self: Chat) -> None:
+    async def send(self: Chat, line: str) -> None:
         """Send a message."""
-        session: PromptSession = PromptSession()  # type: ignore[type-arg]
-        while True:
-            with patch_stdout():
-                try:
-                    line = await session.prompt_async("> ")
-                except KeyboardInterrupt:
-                    line = "/quit"
-            print("\033[1A", end="\r")  # noqa: T201
-            if line in ("/quit", "/q"):
-                self.exit = True
-                return
-            if line in ("/clear", "/c", "/cls"):
-                os.system("clear")  # noqa: ASYNC102, S607, S605
-                continue
+        ts = self.now()
+        try:
+            dest, message = line.split(" ", 1)
+        except ValueError:
+            self.output.error("Invalid message format.")
+            self.output.hint("Try: <destination callsign> <message>")
+            return
+        if not message:
+            self.output.error("Message cannot be empty.")
+            return
 
-            ts = self.now()
-            try:
-                dest, message = line.split(" ", 1)
-            except ValueError:
-                self.output.error("Invalid message format.")
-                self.output.hint("Try: <destination callsign> <message>")
-                continue
+        msg = f"Sending: {ts} {dest}: {message}"
+        self.output.info(msg)
+        payload = (
+            InfoByte(MessageType.MSG, CompressionType.SMAZ).to_byte()
+            + MsgId(self.counter).to_bytes()
+            + Message(string=message, compress=CompressionType.SMAZ).to_bytes()
+        )
+        self.output.debug(f"Payload length: {len(payload)} bytes")
 
-            msg = f"Sending: {ts} {dest}: {message}"
-            self.output.info(msg)
-            payload = (
-                InfoByte(MessageType.MSG, CompressionType.SMAZ).to_byte()
-                + MsgId(self.counter).to_bytes()
-                + Message(string=message, compress=CompressionType.SMAZ).to_bytes()
-            )
-            self.output.debug(f"Payload length: {len(payload)} bytes")
+        raw_frame = AX25UnnumberedInformationFrame(
+            destination=dest,
+            source=self.config.callsign,
+            payload=payload,
+            pid=0xF0,
+        )
+        self.out_queue.append(raw_frame)
 
-            raw_frame = AX25UnnumberedInformationFrame(
-                destination=dest,
-                source=self.config.callsign,
-                payload=payload,
-                pid=0xF0,
-            )
-            self.out_queue.append(raw_frame)
-
-            msg = f"Sent AX25: {ts} {dest}: {message}"
-            self.output.info(msg)
-            self.pending_ack[self.counter] = (
-                ts,
-                self.counter,
-                self.config.callsign,
-                dest,
-                message,
-            )
-            self.line_print(ts, "S", self.config.callsign, dest, message)
-            self.counter += 1
+        msg = f"Sent AX25: {ts} {dest}: {message}"
+        self.output.info(msg)
+        fmsg = FormattedMsg(
+            colors=self.config.colors,
+            counter=self.counter,
+            timestamp=ts,
+            indicator="S",
+            source=self.config.callsign,
+            destination=dest,
+            message=message,
+        )
+        self.output.ui_output.append(fmsg)
+        self.output.ui_refresh()
+        self.counter += 1
 
     def tx_complete(
         self: Chat,
@@ -257,6 +236,4 @@ class Chat:
 
     async def run(self: Chat) -> None:
         """Run the chat client."""
-        async with asyncio.TaskGroup() as tg:
-            _task2 = tg.create_task(self.send())
-            _task3 = tg.create_task(self.process())
+        await self.process()

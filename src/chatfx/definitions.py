@@ -2,14 +2,170 @@
 
 from __future__ import annotations
 
+import textwrap
+
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
+from typing import NamedTuple
+from typing import NewType
 from typing import Union
 
 import smaz
 
+from chatfx.colors import color_by_name
+from chatfx.utils import scaled_width
+from chatfx.utils import ts_full
+
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
 
 JSONVal = Union[None, bool, str, float, int, list["JSONVal"], dict[str, "JSONVal"]]
+
+
+@dataclass
+class TermFeatures:
+    """Terminal features."""
+
+    color: bool
+    links: bool
+
+    def any_enabled(self: TermFeatures) -> bool:
+        """Return True if any features are enabled."""
+        return any((self.color, self.links))
+
+
+@dataclass
+class FormattedText:
+    """A formatted log message."""
+
+    #: The message
+    message: str
+    #: The log level
+    indicator: int
+    #: The time the message was logged
+    time_stamp: datetime.datetime
+    #: color
+    color: str
+
+    def lines(
+        self: FormattedText,
+        width: int,
+    ) -> CursesLines:
+        """Output exit message to the console.
+
+        :param width: Constrain message to width
+        :returns: The message as a string
+        """
+        width = scaled_width(width)
+        c_lines = []
+        message_lines = self.message.splitlines()
+
+        ts = ts_full(self.time_stamp)
+
+        s_indent = " " * (len(ts) + len(" X|"))
+
+        indent_str = f"{ts} {self.indicator}|"
+
+        lines = textwrap.fill(
+            message_lines[0],
+            width=width,
+            break_on_hyphens=False,
+            initial_indent=indent_str,
+            subsequent_indent=s_indent,
+        ).splitlines()
+        c_lines.extend(
+            [
+                CursesLine(
+                    (CursesLinePart(line, self.color, 0),),
+                )
+                for line in lines
+            ],
+        )
+        if len(message_lines) > 1:
+            for line in message_lines[1:]:
+                lines = textwrap.fill(
+                    line,
+                    width=width,
+                    break_on_hyphens=False,
+                    initial_indent=" " * len(indent_str),
+                    subsequent_indent=" " * len(indent_str),
+                ).splitlines()
+                c_lines.extend(
+                    [
+                        CursesLine(
+                            (CursesLinePart(line, self.color, 0),),
+                        )
+                        for line in lines
+                    ],
+                )
+        return CursesLines(tuple(c_lines))
+
+
+@dataclass
+class FormattedMsg:
+    """A formatted message class."""
+
+    counter: int
+    source: str
+    destination: str
+    message: str
+    timestamp: datetime
+    indicator: str
+    colors: dict[str, str]
+
+    def lines(self: FormattedMsg, width: int) -> CursesLines:
+        """Render the message."""
+        tcolor = icolor = pcolor = color_by_name("dimgray")
+        if self.indicator == "S":
+            scolor = dcolor = mcolor = acolor = color_by_name("dimgray")
+        if self.indicator in ("R", "A"):
+            scolor = color_by_name(self.colors.get(self.source, "white"))
+            dcolor = color_by_name(self.colors.get(self.destination, "white"))
+            mcolor = acolor = scolor
+
+        prefix = [
+            CursesLinePart(self.timestamp.strftime("%m/%d/%y %H:%M:%S"), tcolor, 0),
+            CursesLinePart(" ", 0, 0),
+            CursesLinePart(self.indicator, icolor, 0),
+            CursesLinePart("|", pcolor, 0),
+            CursesLinePart(self.source, scolor, 0),
+            CursesLinePart(">", acolor, 0),
+            CursesLinePart(self.destination, dcolor, 0),
+            CursesLinePart(" ", 0, 0),
+        ]
+
+        prefix_length = sum(len(part.string) for part in prefix)
+
+        message_lines = self.message.splitlines()
+
+        first_lines = textwrap.fill(
+            message_lines[0],
+            width=width - prefix_length,
+            break_on_hyphens=False,
+            initial_indent=" " * prefix_length,
+            subsequent_indent=" " * prefix_length,
+        ).splitlines()
+
+        first_line = [*prefix, CursesLinePart(first_lines[0].lstrip(), mcolor, 0)]
+
+        c_lines = [CursesLine(tuple(first_line))]
+        c_lines.extend(CursesLine((CursesLinePart(line, mcolor, 0),)) for line in first_lines[1:])
+
+        if len(message_lines) > 1:
+            for line in message_lines[1:]:
+                lines = textwrap.fill(
+                    line,
+                    width=width - prefix_length,
+                    break_on_hyphens=False,
+                    initial_indent=" " * prefix_length,
+                    subsequent_indent=" " * prefix_length,
+                ).splitlines()
+                c_lines.extend(CursesLine((CursesLinePart(line, mcolor, 0),)) for line in lines)
+
+        return CursesLines(tuple(c_lines))
 
 
 @dataclass
@@ -160,3 +316,23 @@ class Message:
         if compression_type == CompressionType.SMAZ:
             return Message(smaz.decompress(bytes(byte_array)))
         return Message(byte_array.decode())
+
+
+class CursesLinePart(NamedTuple):
+    """One chunk of a line of text.
+
+    :param string: the text to be displayed
+    :param color: An integer representing a color, not a curses.color_pair(n)
+    :param decoration: A curses decoration
+    """
+
+    string: str
+    color: int
+    decoration: int
+
+
+CursesLine = NewType("CursesLine", tuple[CursesLinePart, ...])
+"""One line of text ready for curses."""
+
+CursesLines = NewType("CursesLines", tuple[CursesLine, ...])
+"""One or more lines of text ready for curses."""

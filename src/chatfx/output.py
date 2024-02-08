@@ -2,83 +2,27 @@
 
 from __future__ import annotations
 
-import decimal
 import logging
-import shutil
 import sys
-import textwrap
 
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Callable
 from typing import TypeVar
 
-from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit import ANSI
+from chatfx.colors import color_by_name
+from chatfx.definitions import FormattedText
+from chatfx.utils import now
 
 
 if TYPE_CHECKING:
+    from chatfx.definitions import FormattedMsg
+
     from .utils import TermFeatures
 
 
 T = TypeVar("T", bound="Level")
-GOLDEN_RATIO = 1.61803398875
-
-
-def round_half_up(number: float) -> int:
-    """Round a number to the nearest integer with ties going away from zero.
-
-    This is different the round() where exact halfway cases are rounded to the nearest
-    even result instead of away from zero. (e.g. round(2.5) = 2, round(3.5) = 4).
-
-    This will always round based on distance from zero. (e.g round(2.5) = 3, round(3.5) = 4).
-
-    :param number: The number to round
-    :returns: The rounded number as an it
-    """
-    rounded = decimal.Decimal(number).quantize(
-        decimal.Decimal("1"),
-        rounding=decimal.ROUND_HALF_UP,
-    )
-    return int(rounded)
-
-
-def console_width() -> int:
-    """Get a console width based on common screen widths.
-
-    :returns: The console width
-    """
-    medium = 80
-    wide = 132
-    width = shutil.get_terminal_size().columns
-    if width <= medium:
-        return width
-    if width <= wide:
-        return max(80, round_half_up(width / GOLDEN_RATIO))
-    return wide
-
-
-class Color:
-    """Color constants."""
-
-    BLACK = "\033[30m"
-    RED = "\033[31m"
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
-    CYAN = "\033[36m"
-    WHITE = "\033[37m"
-    GREY = "\033[90m"  # Bright black?
-    BRIGHT_RED = "\033[91m"
-    BRIGHT_GREEN = "\033[92m"
-    BRIGHT_YELLOW = "\033[93m"
-    BRIGHT_BLUE = "\033[94m"
-    BRIGHT_MAGENTA = "\033[95m"
-    BRIGHT_CYAN = "\033[96m"
-    BRIGHT_WHITE = "\033[97m"
-    END = "\033[0m"
 
 
 class Level(Enum):
@@ -109,101 +53,16 @@ class Level(Enum):
         }
         return mapping[self]
 
-    @classmethod
-    def _longest_name(cls: type[T]) -> int:
-        """Return the longest exit message prefix.
 
-        :returns: The longest exit message prefix
-        """
-        return max(len(member.value) for member in cls)
-
-    @classmethod
-    def longest_formatted(cls: type[T]) -> int:
-        """Return the longest exit message prefix.
-
-        :returns: The longest exit message prefix
-        """
-        return max(len(str(member)) for member in cls)
-
-    def __str__(self: Level) -> str:
-        """Return the exit message prefix as a string.
-
-        :returns: The exit message prefix as a string
-        """
-        return f"{' ' * (self._longest_name() - len(self.name))}{self.name.capitalize()}: "
-
-
-@dataclass
-class Msg:
-    """An object to hold a message to present when exiting."""
-
-    #: The message that will be presented
-    message: str
-    #: The prefix for the message, used for formatting
-    prefix: Level = Level.ERROR
-
-    @property
-    def color(self: Msg) -> str:
-        """Return a color for the prefix.
-
-        :returns: The color for the prefix
-        """
-        color_mapping = {
-            Level.CRITICAL: Color.BRIGHT_RED,
-            Level.DEBUG: Color.GREY,
-            Level.ERROR: Color.RED,
-            Level.HINT: Color.CYAN,
-            Level.INFO: Color.MAGENTA,
-            Level.NOTE: Color.GREEN,
-            Level.WARNING: Color.YELLOW,
-        }
-        return color_mapping[self.prefix]
-
-    def to_lines(
-        self: Msg,
-        color: bool,  # noqa: FBT001
-        width: int,
-        with_prefix: bool,  # noqa: FBT001
-    ) -> list[str]:
-        """Output exit message to the console.
-
-        :param color: Whether to color the message
-        :param width: Constrain message to width
-        :param with_prefix: Whether to prefix the message
-        :returns: The exit message as a string
-        """
-        prefix_length = Level.longest_formatted()
-        indent = " " * prefix_length
-
-        lines = []
-        message_lines = self.message.splitlines()
-
-        lines.extend(
-            textwrap.fill(
-                message_lines[0],
-                width=width,
-                break_on_hyphens=False,
-                initial_indent=str(self.prefix) if with_prefix else indent,
-                subsequent_indent=indent,
-            ).splitlines(),
-        )
-
-        if len(message_lines) > 1:
-            for line in message_lines[1:]:
-                lines.extend(
-                    textwrap.fill(
-                        line,
-                        width=width,
-                        break_on_hyphens=False,
-                        initial_indent=indent,
-                        subsequent_indent=indent,
-                    ).splitlines(),
-                )
-
-        start_color = self.color if color else ""
-        end_color = Color.END if color else ""
-
-        return [f"{start_color}{line}{end_color}" for line in lines]
+COLOR_MAPPING = {
+    Level.CRITICAL: color_by_name("red"),
+    Level.DEBUG: color_by_name("dimgrey"),
+    Level.ERROR: color_by_name("crimson"),
+    Level.HINT: color_by_name("limegreen"),
+    Level.INFO: color_by_name("lightskyblue"),
+    Level.NOTE: color_by_name("green"),
+    Level.WARNING: color_by_name("yello"),
+}
 
 
 class Output:
@@ -216,6 +75,8 @@ class Output:
         log_append: str,
         term_features: TermFeatures,
         verbosity: int,
+        ui_refresh: Callable[[], None],
+        ui_output: list[FormattedText | FormattedMsg],
     ) -> None:
         """Initialize the output object.
 
@@ -236,6 +97,8 @@ class Output:
             "note": 0,
             "warning": 0,
         }
+        self.ui_refresh = ui_refresh
+        self.ui_output = ui_output
         self.term_features = term_features
         self.logger = logging.getLogger("chatfx")
         if log_level != "notset":
@@ -321,8 +184,6 @@ class Output:
         if self.log_to_file:
             self.logger.log(level.log_level, msg, stacklevel=3)
 
-        set_width = console_width()
-
         debug = 2
         info = 1
         if (self._verbosity < debug and level == Level.DEBUG) or (
@@ -330,12 +191,12 @@ class Output:
         ):
             return
 
-        lines = Msg(message=msg, prefix=level).to_lines(
-            color=self.term_features.color,
-            width=set_width,
-            with_prefix=True,
+        self.ui_output.append(
+            FormattedText(
+                message=msg,
+                indicator=logging.getLevelName(level.log_level)[0],
+                time_stamp=now(),
+                color=COLOR_MAPPING[level],
+            ),
         )
-        if level in (Level.CRITICAL, Level.ERROR):
-            print(ANSI("\n".join(lines)), file=sys.stderr)
-        else:
-            print(ANSI("\n".join(lines)))
+        self.ui_refresh()

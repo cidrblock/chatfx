@@ -11,8 +11,12 @@ description = "A radical approach to testing ansible content"
 readme = "README.md"
 keywords = ["ax25", "fx25", "ham"]
 license = { text = "MIT" }
-maintainers = [{ "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" }]
-authors = [{ "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" }]
+maintainers = [
+    { "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" },
+]
+authors = [
+    { "name" = "Bradley A. Thornton", "email" = "brad@thethorntons.net" },
+]
 requires-python = ">=3.9"
 classifiers = [
     'Development Status :: 2 - Pre-Alpha',
@@ -35,7 +39,7 @@ classifiers = [
 dynamic = ["dependencies", "optional-dependencies", "version"]
 
 [project.scripts]
-chatfx = "chatfx.cli:main"
+chatfx = "chatfx.run:main"
 
 [tool]
 
@@ -66,9 +70,9 @@ convention = "pep257"
 
 
 [tool.setuptools.dynamic]
-dependencies = {file = [".config/requirements.in"]}
-optional-dependencies.test = {file = [".config/requirements-test.txt"]}
-optional-dependencies.dev = {file = [".config/requirements-dev.txt"]}
+dependencies = { file = [".config/requirements.in"] }
+optional-dependencies.test = { file = [".config/requirements-test.txt"] }
+optional-dependencies.dev = { file = [".config/requirements-dev.txt"] }
 
 
 [tool.setuptools_scm]
