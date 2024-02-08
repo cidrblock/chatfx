@@ -7,7 +7,7 @@ RUN dnf -y update && \
     dnf clean all && \
     rm -rf /var/cache /var/log/dnf* /var/log/yum.*
 
-RUN git clone https://www.github.com/wb2osz/direwolf && \
+RUN git clone https://www.github.com/wb2osz/direwolf.git && \
     cd direwolf && \
     mkdir build && cd build && \
     cmake .. && \
