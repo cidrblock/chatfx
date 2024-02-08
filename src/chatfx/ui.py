@@ -5,6 +5,7 @@ import asyncio
 import curses
 import curses.textpad
 import datetime
+import os
 import sys
 
 from typing import TYPE_CHECKING
@@ -148,6 +149,8 @@ class Ui:
             stripped = text.split(" ", 1)[1]
             self.output.append(FormattedText(content=stripped.splitlines()))
             self.refresh()
+        if text.startswith("/restart"):
+            os.execv(sys.argv[0], sys.argv)
 
     async def run(self: Ui) -> None:  # noqa: C901
         """Run the user interface."""
