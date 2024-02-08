@@ -52,7 +52,7 @@ class Ui:
 
         # Enable mouse scrolling
         self.stdscr.keypad(True)  # noqa: FBT003
-        self.stdscr.timeout(10)
+        self.stdscr.timeout(50)
 
     def _set_colors(self: Ui) -> None:
         """Set the colors for curses."""
