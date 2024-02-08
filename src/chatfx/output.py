@@ -9,7 +9,6 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Callable
-from typing import TypeVar
 
 from chatfx.colors import color_by_name
 from chatfx.definitions import FormattedText
@@ -20,9 +19,6 @@ if TYPE_CHECKING:
     from chatfx.definitions import FormattedMsg
 
     from .utils import TermFeatures
-
-
-T = TypeVar("T", bound="Level")
 
 
 class Level(Enum):

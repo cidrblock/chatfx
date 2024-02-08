@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from chatfx.colors import COLORS
 from chatfx.definitions import FormattedText
+from chatfx.utils import now
 from chatfx.utils import scale_for_curses
 
 
@@ -143,15 +144,21 @@ class Ui:
             sys.exit(0)
         if text in ("/clear", "/cls"):
             self.text = ""
-            self.output = []
+            self.output.clear()
             self.refresh_main_window()
         if text.startswith(("/echo", "/e")):
             stripped = text.split(" ", 1)[1]
-            self.output.append(FormattedText(content=stripped.splitlines()))
+            self.output.append(
+                FormattedText(
+                    message=stripped,
+                    timestamp=now(),
+                    color="white",
+                ),
+            )
             self.refresh()
         if text.startswith("/restart"):
             curses.endwin()
-            os.execv(sys.argv[0], sys.argv)
+            os.execv(sys.argv[0], sys.argv)  # noqa: S606
 
     async def run(self: Ui) -> None:  # noqa: C901
         """Run the user interface."""
