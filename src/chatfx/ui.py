@@ -150,6 +150,7 @@ class Ui:
             self.output.append(FormattedText(content=stripped.splitlines()))
             self.refresh()
         if text.startswith("/restart"):
+            curses.endwin()
             os.execv(sys.argv[0], sys.argv)
 
     async def run(self: Ui) -> None:  # noqa: C901
