@@ -151,7 +151,8 @@ class Ui:
             self.output.append(
                 FormattedText(
                     message=stripped,
-                    timestamp=now(),
+                    indicator="M",
+                    time_stamp=now(),
                     color="white",
                 ),
             )
