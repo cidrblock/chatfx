@@ -3,7 +3,7 @@ FROM registry.fedoraproject.org/fedora:latest
 RUN dnf -y update && \
     dnf -y install git gcc gcc-c++ make alsa-lib-devel \
            libudev-devel avahi-devel cmake3 alsa-utils \
-           python3 python3-pip && \
+           python3 python3-pip python3-devel && \
     dnf clean all && \
     rm -rf /var/cache /var/log/dnf* /var/log/yum.*
 
