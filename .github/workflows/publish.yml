@@ -15,5 +15,5 @@ jobs:
 
       - name: Build the hello-docker Docker image
         run: |
-          docker build /home/runner/work/chatfx/chatfx/podman/Containerfile --tag ghcr.io/cidrblock/chatfx:latest
+          docker build $GITHUB_WORKSPACE/chatfx/podman/Containerfile --tag ghcr.io/cidrblock/chatfx:latest
           docker push ghcr.io/cidrblock/chatfx:latest
