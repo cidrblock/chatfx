@@ -11,6 +11,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from chatfx.colors import COLORS
+from chatfx.colors import color_by_name
 from chatfx.definitions import FormattedText
 from chatfx.utils import now
 from chatfx.utils import scale_for_curses
@@ -153,7 +154,7 @@ class Ui:
                     message=stripped,
                     indicator="M",
                     time_stamp=now(),
-                    color="white",
+                    color=color_by_name("white"),
                 ),
             )
             self.refresh()

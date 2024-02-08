@@ -57,7 +57,7 @@ COLOR_MAPPING = {
     Level.HINT: color_by_name("limegreen"),
     Level.INFO: color_by_name("lightskyblue"),
     Level.NOTE: color_by_name("green"),
-    Level.WARNING: color_by_name("yello"),
+    Level.WARNING: color_by_name("yellow"),
 }
 
 
