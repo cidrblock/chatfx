@@ -33,8 +33,9 @@ RUN microdnf -y install python3.12 alsa-lib avahi-libs && \
     microdnf clean all
 
 ENV PATH=/app/bin:$PATH
-ENV DIREWOLF_PARAMS="-d x2o -t 0 -q d -c /etc/direwolf.conf"
-ENV CHATFX_PARAMS="-s /etc/chatfx.toml"
+ENV DIREWOLF_PARAMS="-d x2o -t 0 -q d -c /working/direwolf.conf"
+ENV CHATFX_PARAMS="-s /working/chatfx.toml"
 ENV TERM=xterm-256color
+WORKDIR /working
 
-CMD nohup /usr/local/bin/direwolf ${DIREWOLF_PARAMS} &> direwolf.log & chatfx ${CHATFX_PARAMS}
+CMD nohup /usr/local/bin/direwolf ${DIREWOLF_PARAMS} &> /working/direwolf.log & chatfx ${CHATFX_PARAMS}
