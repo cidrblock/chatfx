@@ -28,6 +28,29 @@ SPACE = 32
 DELETE = 127
 TILDE = 126
 
+HELP = """Summary of commands:
+\t/quit, /exit, /q: Quit the chat
+\t/clear, /cls: Clear the chat
+\t/restart: Restart the chat
+\t/echo, /e: Echo a message
+---
+Summary of indicators:
+\tC: Critical
+\tE: Error
+\tW: Warning
+\tH: Hint
+\tN: Note
+\tI: Information
+\tD: Debug
+\tS: A message that was sent
+\tA: A message that was acknowledged
+\tR: A message that was received
+---
+Send a message:
+\t<destination> <message>
+\te.g. REDBEARD Hello!
+"""
+
 
 class Ui:
     """The main user interface."""
@@ -161,6 +184,16 @@ class Ui:
         if text.startswith("/restart"):
             curses.endwin()
             os.execv(sys.argv[0], sys.argv)  # noqa: S606
+        if text.startswith("/help"):
+            self.output.append(
+                FormattedText(
+                    message=HELP,
+                    indicator=" ",
+                    time_stamp=now(),
+                    color=color_by_name("lawngreen"),
+                ),
+            )
+            self.refresh()
 
     async def run(self: Ui) -> None:  # noqa: C901
         """Run the user interface."""
