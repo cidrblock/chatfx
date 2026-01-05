@@ -23,8 +23,11 @@ The command line parameters can be found using `--help`.
 
 ```
 $ chatfx --help
-usage: chatfx [-h] [-c CALLSIGN] [-k HOST] [-p PORT] [-t TIME_DELAY] [-s SETTINGS_FILE] [--lf LOG_FILE] [--ll {notset,debug,info,warning,error,critical}]
-              [--la {true,false}] [-v]
+usage: chatfx [-h] [-c CALLSIGN] [-k HOST] [-p PORT] [-t TIME_DELAY] [-s SETTINGS_FILE] 
+              [--lf LOG_FILE] [--ll {notset,debug,info,warning,error,critical}]
+              [--la {true,false}] [--connection-type {tcp,serial,bluetooth}]
+              [--bluetooth-address BLUETOOTH_ADDRESS] [--bluetooth-name BLUETOOTH_NAME]
+              [--baudrate BAUDRATE] [--serial-device SERIAL_DEVICE] [-v]
 
 Chatfx - Chat client for AX.25 packet radio networks.
 
@@ -45,12 +48,44 @@ options:
                         Log level for file output. default=debug
   --la {true,false}, --log-append <bool> {true,false}
                         Append to log file. default=false
+  --connection-type {tcp,serial,bluetooth}
+                        Connection type for KISS TNC. default=tcp
+  --bluetooth-address BLUETOOTH_ADDRESS
+                        Bluetooth device MAC address (e.g., AA:BB:CC:DD:EE:FF)
+  --bluetooth-name BLUETOOTH_NAME
+                        Bluetooth device name for auto-discovery
+  --baudrate BAUDRATE   Serial port baudrate for KISS TNC. default=9600
+  --serial-device SERIAL_DEVICE
+                        Serial device path (e.g., /dev/rfcomm0 or COM3)
   -v, --verbose         Give more CLI output. Option is additive, and can be used up to 3 times. default=0
 ```
 
+### Connection Types
+
+**TCP (default)** - Connect to a KISS TNC via TCP (e.g., direwolf)
+```bash
+chatfx -c MYCALL -k localhost -p 8001
+```
+
+**Serial** - Connect to a KISS TNC via serial port
+```bash
+chatfx -c MYCALL --connection-type serial --serial-device /dev/ttyUSB0 --baudrate 9600
+```
+
+**Bluetooth** - Connect to a Bluetooth KISS TNC (e.g., BTECH UV-PRO)
+```bash
+# Using MAC address (recommended for headless systems)
+chatfx -c MYCALL --connection-type bluetooth --bluetooth-address AA:BB:CC:DD:EE:FF
+
+# Using device name (auto-discovery)
+chatfx -c MYCALL --connection-type bluetooth --bluetooth-name "UV-PRO"
+```
+
+### Settings File
+
 Using a settings file is an alternative to providing the settings at the command line. The settings file should be stored in the `$XDG_CONFIG_HOME/chatfx` (typically `/home/username/.config/chatfx`) and called `settings.toml`.
 
-A sample settings file follows:
+A sample settings file for TCP (direwolf) follows:
 
 ```toml
 callsign = "RB1"
@@ -66,6 +101,22 @@ verbose = 3
 [colors]
 rb1 = "Aqua"
 rb2 = "YellowGreen"
+```
+
+A sample settings file for Bluetooth (headless) follows:
+
+```toml
+callsign = "MYCALL"
+connection-type = "bluetooth"
+bluetooth-address = "AA:BB:CC:DD:EE:FF"
+baudrate = 9600
+log-file = "/tmp/chatfx.log"
+log-level = "debug"
+time-delay = 2
+verbose = 3
+
+[colors]
+mycall = "Aqua"
 ```
 
 Note: See the colors section below for a description of the colors section.
@@ -168,3 +219,115 @@ To disable gdm sleep
 ```
 sudo -u gdm dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
 ```
+
+## Bluetooth KISS TNC Setup
+
+For headless Bluetooth operation (e.g., BTECH UV-PRO), the application can automatically discover and connect to Bluetooth devices.
+
+### Prerequisites
+
+Install PyBluez for Bluetooth support:
+
+```bash
+# Fedora/RHEL
+sudo dnf install python3-bluez bluez-libs-devel
+
+# Debian/Ubuntu
+sudo apt-get install python3-bluez libbluetooth-dev
+
+# Install via pip
+pip install pybluez
+```
+
+### Headless Configuration
+
+For fully automatic headless operation, you can either:
+
+1. **Use MAC address** (recommended for headless systems):
+   ```bash
+   chatfx -c MYCALL --connection-type bluetooth --bluetooth-address AA:BB:CC:DD:EE:FF
+   ```
+
+2. **Use device name** (auto-discovery):
+   ```bash
+   chatfx -c MYCALL --connection-type bluetooth --bluetooth-name "UV-PRO"
+   ```
+
+3. **Pre-configure /dev/rfcomm device** (Linux only):
+   
+   Create `/etc/bluetooth/rfcomm.conf`:
+   ```
+   rfcomm0 {
+       bind yes;
+       device AA:BB:CC:DD:EE:FF;
+       channel 1;
+       comment "BTECH UV-PRO";
+   }
+   ```
+   
+   Then use:
+   ```bash
+   chatfx -c MYCALL --connection-type serial --serial-device /dev/rfcomm0
+   ```
+
+### Finding Your Bluetooth Device
+
+To find your device's MAC address:
+
+```bash
+# Linux
+bluetoothctl
+scan on
+# Wait for devices to appear, note the MAC address
+scan off
+exit
+
+# Or use the Python script
+python3 -c "import bluetooth; print(bluetooth.discover_devices(lookup_names=True))"
+```
+
+### Troubleshooting Bluetooth
+
+**Permission denied errors:**
+```bash
+# Add your user to the bluetooth group
+sudo usermod -a -G bluetooth $USER
+# Log out and back in
+```
+
+**Device not found:**
+- Ensure the device is powered on and in pairing mode
+- Check that Bluetooth is enabled: `bluetoothctl power on`
+- Try manual discovery: `bluetoothctl scan on`
+
+**Connection refused:**
+- The device may need to be paired first via `bluetoothctl pair AA:BB:CC:DD:EE:FF`
+- Some devices require trust: `bluetoothctl trust AA:BB:CC:DD:EE:FF`
+
+**For Raspberry Pi headless setup:**
+```bash
+# Enable Bluetooth service
+sudo systemctl enable bluetooth
+sudo systemctl start bluetooth
+
+# Auto-reconnect on boot (systemd service)
+sudo vi /etc/systemd/system/chatfx-bluetooth.service
+```
+
+Example systemd service:
+```ini
+[Unit]
+Description=ChatFX Bluetooth KISS TNC
+After=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/local/bin/chatfx -c MYCALL --connection-type bluetooth --bluetooth-address AA:BB:CC:DD:EE:FF
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
