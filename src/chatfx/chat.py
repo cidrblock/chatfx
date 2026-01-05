@@ -12,7 +12,9 @@ from typing import Callable
 
 from aioax25.frame import AX25UnnumberedInformationFrame
 from aioax25.interface import AX25Interface
+from aioax25.kiss import BaseKISSDevice
 from aioax25.kiss import KISSDeviceState
+from aioax25.kiss import SerialKISSDevice
 from aioax25.kiss import TCPKISSDevice
 from aioax25.kiss import make_device
 
@@ -47,7 +49,7 @@ class Chat:
         """
         self.config: Config = config
         self.counter: int = 0
-        self.device: TCPKISSDevice
+        self.device: TCPKISSDevice | SerialKISSDevice | BaseKISSDevice
         self.exit: bool = False
         self.interface: AX25Interface
         self.out_queue: list[AX25UnnumberedInformationFrame] = []
@@ -55,23 +57,87 @@ class Chat:
         self.ui_output = ui_output
         self.ui_refresh = ui_refresh
 
-    async def build_device(self: Chat) -> TCPKISSDevice:
-        """Build the TCPKISSDevice."""
-        self.device = make_device(
-            type="tcp",
-            host=self.config.host,
-            port=self.config.port,
-            kiss_commands=[],
-        )
+    async def build_device(self: Chat) -> TCPKISSDevice | SerialKISSDevice:
+        """Build the KISS Device based on connection type."""
+        connection_type = self.config.connection_type.lower()
+
+        if connection_type == "tcp":
+            self.output.info("Creating TCP KISS device")
+            self.device = make_device(
+                type="tcp",
+                host=self.config.host,
+                port=self.config.port,
+                kiss_commands=[],
+            )
+        elif connection_type == "serial":
+            # Direct serial connection (user must specify device path)
+            serial_device = getattr(self.config, "serial_device", None)
+            if not serial_device:
+                msg = "Serial device path required for serial connection type"
+                self.output.critical(msg)
+                sys.exit(1)
+
+            self.output.info(f"Creating serial KISS device: {serial_device}")
+            self.device = make_device(
+                type="serial",
+                device=serial_device,
+                baudrate=self.config.baudrate,
+                kiss_commands=[],
+            )
+        elif connection_type == "bluetooth":
+            # Automatic Bluetooth connection for headless operation
+            self.output.info("Setting up Bluetooth connection")
+            try:
+                from chatfx.bluetooth import ensure_bluetooth_connected
+            except ImportError:
+                msg = "PyBluez not installed. Install with: pip install pybluez"
+                self.output.critical(msg)
+                sys.exit(1)
+
+            # Try to connect to Bluetooth device
+            try:
+                result = ensure_bluetooth_connected(
+                    self.output,
+                    self.config.bluetooth_address,
+                    self.config.bluetooth_name,
+                )
+
+                # Check if result is a path or socket
+                if isinstance(result, str):
+                    # It's a path to /dev/rfcommX
+                    self.output.info(f"Using Bluetooth serial device: {result}")
+                    self.device = make_device(
+                        type="serial",
+                        device=result,
+                        baudrate=self.config.baudrate,
+                        kiss_commands=[],
+                    )
+                else:
+                    # It's a Bluetooth socket - we need to wrap it
+                    # For now, this requires a serial port to be set up
+                    msg = (
+                        "Direct Bluetooth socket not yet supported. "
+                        "Please configure /dev/rfcomm0 via system tools."
+                    )
+                    self.output.critical(msg)
+                    sys.exit(1)
+            except (ConnectionError, ValueError) as e:
+                self.output.critical(f"Bluetooth connection failed: {e}")
+                sys.exit(1)
+        else:
+            msg = f"Unknown connection type: {connection_type}"
+            self.output.critical(msg)
+            sys.exit(1)
+
         self.device.open()
         await asyncio.sleep(0.1)
         i = 1
         max_attempts = 4
         while self.device.state != KISSDeviceState.OPEN:
-            msg = f"Waiting for direwolf connection... attempt {i}/{max_attempts}"
+            msg = f"Waiting for KISS device connection... attempt {i}/{max_attempts}"
             print(msg, end="\r")  # noqa: T201
             if i > max_attempts:
-                msg = "Cannot connect to direwolf. Is it running?"
+                msg = f"Cannot connect to KISS device via {connection_type}. Is it available?"
                 self.output.critical(msg)
                 sys.exit(1)
 

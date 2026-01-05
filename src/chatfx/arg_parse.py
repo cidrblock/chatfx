@@ -68,4 +68,31 @@ def arg_parser() -> argparse.Namespace:
         action="count",
         help="Give more CLI output. Option is additive, and can be used up to 3 times. default=0",
     )
+    parser.add_argument(
+        "--connection-type",
+        dest="connection_type",
+        choices=["tcp", "serial", "bluetooth"],
+        help="Connection type for KISS TNC. default=tcp",
+    )
+    parser.add_argument(
+        "--bluetooth-address",
+        dest="bluetooth_address",
+        help="Bluetooth device MAC address (e.g., AA:BB:CC:DD:EE:FF)",
+    )
+    parser.add_argument(
+        "--bluetooth-name",
+        dest="bluetooth_name",
+        help="Bluetooth device name for auto-discovery",
+    )
+    parser.add_argument(
+        "--baudrate",
+        dest="baudrate",
+        type=int,
+        help="Serial port baudrate for KISS TNC. default=9600",
+    )
+    parser.add_argument(
+        "--serial-device",
+        dest="serial_device",
+        help="Serial device path (e.g., /dev/rfcomm0 or COM3)",
+    )
     return parser.parse_args()
