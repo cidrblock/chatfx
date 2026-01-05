@@ -181,17 +181,25 @@ class Config:
     port: int
     time_delay: float
     verbose: int
+    connection_type: str = "tcp"
+    bluetooth_address: str | None = None
+    bluetooth_name: str | None = None
+    baudrate: int = 9600
 
     def __str__(self: Config) -> str:
         """Return the configuration as a string."""
         return (
             "\n"
             f"\tcallsign: {self.callsign}\n"
+            f"\tconnection_type: {self.connection_type}\n"
             f"\thost: {self.host}\n"
             f"\tlog_file: {self.log_file}\n"
             f"\tlog_level: {self.log_level}\n"
             f"\tlog_append: {self.log_append}\n"
             f"\tport: {self.port}\n"
+            f"\tbaudrate: {self.baudrate}\n"
+            f"\tbluetooth_address: {self.bluetooth_address}\n"
+            f"\tbluetooth_name: {self.bluetooth_name}\n"
             f"\ttime_delay: {self.time_delay}\n"
             f"\tverbosity: {self.verbose}"
         )

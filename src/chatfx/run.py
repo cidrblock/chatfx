@@ -1,6 +1,5 @@
 """Run the chatfx application."""
 import asyncio
-import curses
 import os
 import sys
 
@@ -57,7 +56,16 @@ async def start() -> None:
         port=args.get("port") or settings.get("port", 8001),
         time_delay=float(args.get("time_delay") or settings.get("time-delay", 3)),
         verbose=args.get("verbose") or settings.get("verbose", 0),
+        connection_type=args.get("connection_type") or settings.get("connection-type", "tcp"),
+        bluetooth_address=args.get("bluetooth_address") or settings.get("bluetooth-address"),
+        bluetooth_name=args.get("bluetooth_name") or settings.get("bluetooth-name"),
+        baudrate=args.get("baudrate") or settings.get("baudrate", 9600),
     )
+
+    # Add serial_device as dynamic attribute if provided
+    serial_device = args.get("serial_device") or settings.get("serial-device")
+    if serial_device:
+        config.serial_device = serial_device  # type: ignore[attr-defined]
 
     ui = Ui()
     ui.init()
